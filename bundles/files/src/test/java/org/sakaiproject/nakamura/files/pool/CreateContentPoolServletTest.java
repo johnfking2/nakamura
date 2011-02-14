@@ -20,15 +20,13 @@ package org.sakaiproject.nakamura.files.pool;
 
 import static org.apache.jackrabbit.JcrConstants.JCR_CONTENT;
 import static org.apache.jackrabbit.JcrConstants.NT_RESOURCE;
-import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.when;
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_MEMBERS_NODE;
-import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_USER_MANAGER;
+
+import com.google.common.collect.ImmutableMap;
 
 import org.apache.jackrabbit.api.JackrabbitSession;
-import org.apache.jackrabbit.api.security.principal.ItemBasedPrincipal;
 import org.apache.jackrabbit.api.security.principal.PrincipalManager;
-import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.apache.jackrabbit.api.security.user.UserManager;
 import org.apache.kahadb.util.ByteArrayInputStream;
 import org.apache.sling.api.SlingHttpServletRequest;
@@ -36,19 +34,25 @@ import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.request.RequestParameter;
 import org.apache.sling.api.request.RequestParameterMap;
 import org.apache.sling.api.request.RequestPathInfo;
+import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.commons.json.JSONObject;
 import org.apache.sling.jcr.api.SlingRepository;
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.osgi.service.component.ComponentContext;
 import org.sakaiproject.nakamura.api.cluster.ClusterTrackingService;
-import org.sakaiproject.nakamura.testutils.mockito.MockitoTestUtils;
+import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.Session;
+import org.sakaiproject.nakamura.api.lite.StorageClientException;
+import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
+import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
+import org.sakaiproject.nakamura.lite.BaseMemoryRepository;
+import org.sakaiproject.nakamura.lite.RepositoryImpl;
+import org.sakaiproject.nakamura.lite.jackrabbit.SparseMapUserManager;
 
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -76,13 +80,11 @@ public class CreateContentPoolServletTest {
   @Mock
   private JackrabbitSession adminSession;
   @Mock
+  private JackrabbitSession jcrSesson;
+  @Mock
   private UserManager userManager;
   @Mock
   private PrincipalManager principalManager;
-  @Mock
-  private ItemBasedPrincipal iebPrincipal;
-  @Mock
-  private Authorizable iebAuthorizable;
   @Mock
   private Node parentNode;
   @Mock
@@ -104,8 +106,6 @@ public class CreateContentPoolServletTest {
   @Mock
   private ClusterTrackingService clusterTrackingService;
   @Mock
-  private ComponentContext componentContext;
-  @Mock
   private SlingHttpServletRequest request;
   @Mock
   private SlingHttpServletResponse response;
@@ -119,18 +119,37 @@ public class CreateContentPoolServletTest {
   private RequestParameter requestParameterNot;
   @Mock
   private RequestPathInfo requestPathInfo;
+  @Mock
+  private ResourceResolver resourceResolver;
+  @Mock
+  private SparseMapUserManager sparseMapUserManager;
+  private RepositoryImpl repository;
 
-  public CreateContentPoolServletTest() {
+  public CreateContentPoolServletTest() throws ClientPoolException, StorageClientException, AccessDeniedException, ClassNotFoundException {
     MockitoAnnotations.initMocks(this);
+    BaseMemoryRepository baseMemoryRepository = new BaseMemoryRepository();
+    repository = baseMemoryRepository.getRepository();
+    Session session = repository.loginAdministrative();
+    AuthorizableManager authorizableManager = session.getAuthorizableManager();
+    authorizableManager.createUser("ieb", "Ian Boston", "test", ImmutableMap.of("x",(Object)"y"));
+    org.sakaiproject.nakamura.api.lite.authorizable.Authorizable authorizable = authorizableManager.findAuthorizable("ieb");
+    System.err.println("Got ieb as "+authorizable);
+    session.logout();
+
   }
 
   @Test
   public void testCreate() throws Exception {
 
     // activate
-    when(clusterTrackingService.getCurrentServerId()).thenReturn("serverID");
     when(slingRepository.loginAdministrative(null)).thenReturn(adminSession);
-
+    
+    when(request.getResourceResolver()).thenReturn(resourceResolver);
+    when(resourceResolver.adaptTo(javax.jcr.Session.class)).thenReturn(jcrSesson);
+    Session session = repository.loginAdministrative("ieb");
+    when(jcrSesson.getUserManager()).thenReturn(sparseMapUserManager);
+    when(sparseMapUserManager.getSession()).thenReturn(session);
+    when(clusterTrackingService.getClusterUniqueId()).thenReturn(String.valueOf(System.currentTimeMillis()));
 
     when(request.getRequestPathInfo()).thenReturn(requestPathInfo);
     when(requestPathInfo.getExtension()).thenReturn(null);
@@ -139,10 +158,6 @@ public class CreateContentPoolServletTest {
     when(adminSession.getPrincipalManager()).thenReturn(principalManager);
     when(adminSession.getAccessControlManager()).thenReturn(accessControlManager);
     when(request.getRemoteUser()).thenReturn("ieb");
-    when(iebPrincipal.getPath()).thenReturn("/i/ie/ieb");
-    iebAuthorizable = MockitoTestUtils.createAuthorizable("ieb", false);
-    when(iebAuthorizable.getPrincipal()).thenReturn(iebPrincipal);
-    when(userManager.getAuthorizable("ieb")).thenReturn(iebAuthorizable);
 
     when(request.getRequestParameterMap()).thenReturn(requestParameterMap);
     Map<String, RequestParameter[]> map = new HashMap<String, RequestParameter[]>();
@@ -168,7 +183,7 @@ public class CreateContentPoolServletTest {
     when(requestParameterNot.isFormField()).thenReturn(true);
 
     // deep create
-    when(adminSession.nodeExists(CreateContentPoolServlet.POOLED_CONTENT_ROOT)).thenReturn(true);
+    // when(adminSession.nodeExists(CreateContentPoolServlet.POOLED_CONTENT_ROOT)).thenReturn(true);
     when(adminSession.itemExists(Mockito.anyString())).thenReturn(true);
 
     // Because the pooled content paths are generated by a private method,
@@ -223,28 +238,17 @@ public class CreateContentPoolServletTest {
     AccessControlPolicy[] acp = new AccessControlPolicy[] { accessControlList };
     when(accessControlManager.getPolicies(Mockito.anyString())).thenReturn(acp);
 
-    // Mock the members node behaviour
-    ArgumentCaptor<String[]> managersCaptor = ArgumentCaptor.forClass(String[].class);
-    when(
-        memberNode.setProperty(Mockito.eq(POOLED_CONTENT_USER_MANAGER), managersCaptor
-            .capture())).thenReturn(null);
-
-    // saving
-    when(adminSession.hasPendingChanges()).thenReturn(true);
 
     StringWriter stringWriter = new StringWriter();
     when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
 
     CreateContentPoolServlet cp = new CreateContentPoolServlet();
     cp.clusterTrackingService = clusterTrackingService;
-    cp.slingRepository = slingRepository;
-    cp.activate(componentContext);
+    cp.sparseRepository = repository;
 
     cp.doPost(request, response);
 
     // Verify that we created all the nodes.
-    assertEquals(1, managersCaptor.getValue().length);
-    assertEquals(iebPrincipal.getName(), managersCaptor.getValue()[0]);
 
     JSONObject jsonObject = new JSONObject(stringWriter.toString());
     Assert.assertNotNull(jsonObject.getString("testfilename.pdf"));

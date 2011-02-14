@@ -26,7 +26,7 @@ import org.apache.felix.scr.annotations.sling.SlingServlet;
 import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.resource.Resource;
-import org.apache.sling.api.servlets.SlingAllMethodsServlet;
+import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
 import org.osgi.framework.ServiceReference;
 import org.osgi.service.component.ComponentContext;
 import org.sakaiproject.nakamura.api.doc.BindingType;
@@ -36,7 +36,9 @@ import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.api.files.FilesConstants;
 import org.sakaiproject.nakamura.api.files.LinkHandler;
+import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.files.JcrInternalFileHandler;
+import org.sakaiproject.nakamura.files.SparseContentInternalFileHandler;
 import org.sakaiproject.nakamura.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,29 +53,15 @@ import javax.servlet.ServletException;
  * Points the request to the actual file.
  * 
  */
-@SlingServlet(resourceTypes={"sakai/link"}, methods={"GET"})
+@SlingServlet(resourceTypes = { "sakai/link" }, methods = { "GET" })
 @Properties(value = {
     @Property(name = "service.description", value = "Links nodes to files."),
     @Property(name = "service.vendor", value = "The Sakai Foundation") })
-@Reference(name="LinkHandler", referenceInterface=LinkHandler.class, cardinality=ReferenceCardinality.OPTIONAL_MULTIPLE, policy=ReferencePolicy.DYNAMIC)
-@ServiceDocumentation(
-    name = "LinkServlet", 
-    shortDescription = "Download file that this link points to.", 
-    description = "When a user hits a sakai/link the file will be downloaded or, if necessary, the request will be redirected to the appropriate url.", 
-    bindings = @ServiceBinding(
-        type = BindingType.TYPE, 
-        bindings = "sakai/link"
-    ), 
-    methods = @ServiceMethod(
-        name = "GET", 
-        description = "Downloads the file.",
-        response = {
-            @ServiceResponse(code = 200, description = "User was successfully linked to the real download (can be file/url)."),
-            @ServiceResponse(code = 500, description = "Failed to redirect, explanation in HTML.")
-        }
-    )
-)
-public class LinkServlet extends SlingAllMethodsServlet {
+@Reference(name = "LinkHandler", referenceInterface = LinkHandler.class, cardinality = ReferenceCardinality.OPTIONAL_MULTIPLE, policy = ReferencePolicy.DYNAMIC)
+@ServiceDocumentation(name = "LinkServlet", shortDescription = "Download file that this link points to.", description = "When a user hits a sakai/link the file will be downloaded or, if necessary, the request will be redirected to the appropriate url.", bindings = @ServiceBinding(type = BindingType.TYPE, bindings = "sakai/link"), methods = @ServiceMethod(name = "GET", description = "Downloads the file.", response = {
+    @ServiceResponse(code = 200, description = "User was successfully linked to the real download (can be file/url)."),
+    @ServiceResponse(code = 500, description = "Failed to redirect, explanation in HTML.") }))
+public class LinkServlet extends SlingSafeMethodsServlet {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(LinkServlet.class);
   private static final long serialVersionUID = -1536743371265952323L;
@@ -88,12 +76,20 @@ public class LinkServlet extends SlingAllMethodsServlet {
       throws ServletException, IOException {
 
     Resource resource = request.getResource();
-    Node node = (Node) resource.adaptTo(Node.class);
+    Node node = resource.adaptTo(Node.class);
+    Content content = resource.adaptTo(Content.class);
 
+    System.err.println("Node is "+node+" content is "+content);
+    String link = null;
     try {
-      if (node.hasProperty(FilesConstants.SAKAI_LINK)) {
-        String link = node.getProperty(FilesConstants.SAKAI_LINK).getString();
+      if (node != null && node.hasProperty(FilesConstants.SAKAI_LINK)) {
+        link = node.getProperty(FilesConstants.SAKAI_LINK).getString();
+      } else if (content != null && content.hasProperty(FilesConstants.SAKAI_LINK)) {
+        link = (String) content.getProperty(FilesConstants.SAKAI_LINK);
+      }
+      System.err.println("Link is "+link);
 
+      if (link != null) {
         String[] linkProps = StringUtils.split(link, ':');
         LinkHandler handler = null;
         String path = null;
@@ -101,20 +97,22 @@ public class LinkServlet extends SlingAllMethodsServlet {
           handler = fileHandlerTracker.getProcessorByName(linkProps[0]);
           path = linkProps[1];
         } else {
-          // We default to JCR.
-          handler = new JcrInternalFileHandler();
+          if ( node != null ) {
+            handler = new JcrInternalFileHandler();
+          } else {
+            handler = new SparseContentInternalFileHandler();
+          }
           path = link;
         }
         if (handler != null) {
           handler.handleFile(request, response, path);
         }
       }
-    } catch (RepositoryException e) {
-      LOGGER.warn("Unable to handle linked file.");
+    } catch (RepositoryException e) {      
+      LOGGER.warn(e.getMessage(), e);
       response.sendError(500, "Unable to handle linked file.");
     }
   }
-
 
   protected void bindLinkHandler(ServiceReference serviceReference) {
     fileHandlerTracker.bindLinkHandler(serviceReference);

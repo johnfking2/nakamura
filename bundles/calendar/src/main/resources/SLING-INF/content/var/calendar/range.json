@@ -1,8 +1,12 @@
 {
-  "sakai:query-language": "xpath",
-  "sakai:query-template" : "/jcr:root{_calendar-path}//*[(@sakai:vcal-DTSTART >= xs:dateTime('{_date-start}') and @sakai:vcal-DTSTART <= xs:dateTime('{_date-end}')) and jcr:like(@sling:resourceType, 'sakai/calendar%')] order by @{sortOn|sakai:vcal-DTSTART} {sortOrder|ascending}",
-  "sling:resourceType": "sakai/search",
-  "sakai:resultprocessor": "Calendar",
+  "sakai:query-template" : "path:${_calendar-path} AND vcal-DTSTART:[${_date-start} TO ${_date-end}] AND resourceType:sakai/calendar*",
+  "sakai:query-template-options": {
+      "sort": "${sortOn} ${sortOrder}"
+  },
+  "sortOn": "vcal-DTSTART",
+  "sortOrder": "asc",
+  "sling:resourceType": "sakai/solr-search",
+  "sakai:resultprocessor": "FullResource",
   "sakai:propertyprovider" : "Calendar",
   "sakai:title": "Calendar - Day feed",
   "sakai:shortDescription": "Find all calendar items for a certain day.",

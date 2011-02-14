@@ -112,7 +112,7 @@ import javax.jcr.RepositoryException;
     )
   }
 )
-@SlingServlet(paths = { "/system/me/groups" }, generateComponent = true, generateService = true, methods = { "GET" })
+@SlingServlet(paths = { "/system/jackrabbitme/groups" }, generateComponent = true, generateService = true, methods = { "GET" })
 @Reference(name="profileService", referenceInterface=ProfileService.class)
 public class MyGroupsServlet extends AbstractMyGroupsServlet {
   private static final long serialVersionUID = 8809581334593701801L;

@@ -108,4 +108,42 @@ public interface FilesConstants {
    */
   public static final String POOLED_CONTENT_CREATED_FOR = "sakai:pool-content-created-for";
 
+  /**
+   * Selector for feed of related content which is accessible by any logged-in user.
+   */
+  public static final String POOLED_CONTENT_RELATED_SELECTOR = "related";
+  /**
+   * Selector for feed of related content which is publicly accessible.
+   */
+  public static final String POOLED_CONTENT_PUBLIC_RELATED_SELECTOR = "relatedpublic";
+
+  /**
+   * Property which stores the UX access scheme for the node.
+   */
+  public static final String ACCESS_SCHEME_PROPERTY = "sakai:permissions";
+  /**
+   * The access scheme which lets any logged-in user see the item.
+   */
+  public static final String LOGGED_IN_ACCESS_SCHEME = "everyone";
+  /**
+   * The access scheme which makes the item visible even to sessions which have not logged in.
+   */
+  public static final String PUBLIC_ACCESS_SCHEME = "public";
+
+  public static final String POOLED_NEEDS_PROCESSING = "sakai:needsprocessing";
+
+  /** Property of when the content was last modified */
+  String LAST_MODIFIED = "lastModified";
+
+  /** Property of who modified the content last */
+  String LAST_MODIFIED_BY = "lastModifiedBy";
+
+  /** Property of when the content was created */
+  String CREATED = "created";
+
+  /** Property of who created the content */
+  String CREATED_BY = "createdBy";
+
+  /** Property of where this content is used*/
+  String LINK_PATHS = "linkpaths";
 }

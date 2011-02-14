@@ -1,7 +1,11 @@
 {
-  "sakai:query-language": "xpath",
-  "sakai:query-template": "/{_userMessagePath}//element(*)[@sling:resourceType='sakai/message' and @{prop}='{val}'] order by @{sortOn|jcr:created} {sortOrder|descending}",
-  "sling:resourceType": "sakai/search",
+  "sakai:query-template": 'path:{_userMessagePath} AND resourceType:sakai/message AND ${prop}:"{val}"',
+  "sakai:query-template-options": {
+      "sort": "${sortOn} ${sortOrder}"
+  },
+  "sortOn": "created",
+  "sortOrder": "desc",
+  "sling:resourceType": "sakai/solr-search",
   "sakai:propertyprovider" : "Message",
   "sakai:resultprocessor": "Message",
   "sakai:title": "Messaging - User - Filter.",
@@ -10,7 +14,7 @@
                       "{\"name\" : \"prop\", \"description\" : \"The property you want to match against.\"}",
                       "{\"name\" : \"val\", \"description\" : \"The value this property should have.\"}",
                       "{\"name\" : \"sortOn\", \"description\" : \"Sort the results on this property.\"}",
-                      "{\"name\" : \"sortOrder\", \"description\" : \"Either 'ascending' or 'descending'.\"}"
+                      "{\"name\" : \"sortOrder\", \"description\" : \"Either 'asc' or 'desc'.\"}"
     ],
   "sakai:description": [
                       "This search will go trough the current's user entire message store looking for messages matching the property from the 'prop' requestparameter against the 'val' request parameter value."

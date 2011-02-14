@@ -61,7 +61,6 @@ import static org.sakaiproject.nakamura.basiclti.BasicLTIServletUtils.sensitiveK
 import static org.sakaiproject.nakamura.basiclti.BasicLTIServletUtils.unsupportedKeys;
 
 import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.sling.SlingServlet;
 import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.apache.jackrabbit.api.security.user.UserManager;
 import org.apache.sling.api.SlingHttpServletRequest;
@@ -152,7 +151,7 @@ import javax.servlet.http.HttpServletResponse;
         @ServiceResponse(code = HttpServletResponse.SC_FORBIDDEN, description = "Unauthorized: The current user does not have permissions to delete the data."),
         @ServiceResponse(code = HttpServletResponse.SC_NOT_FOUND, description = "Resource could not be found."),
         @ServiceResponse(code = HttpServletResponse.SC_INTERNAL_SERVER_ERROR, description = "Unable to delete the node due to a runtime error.") }) })
-@SlingServlet(methods = { "GET", "POST", "PUT", "DELETE" }, resourceTypes = { "sakai/basiclti" })
+// @SlingServlet(methods = { "GET", "POST", "PUT", "DELETE" }, resourceTypes = { "sakai/basiclti" })
 public class BasicLTIConsumerServlet extends SlingAllMethodsServlet {
   private static final long serialVersionUID = 5985490994324951127L;
   private static final Logger LOG = LoggerFactory
@@ -388,21 +387,22 @@ public class BasicLTIConsumerServlet extends SlingAllMethodsServlet {
         launchProps.put(USER_ID, az.getID());
       }
 
-      final Node siteNode = findSiteNode(node);
-      if (siteNode == null) {
-        final String message = "Could not locate site node.";
+      final Node groupHomeNode = findGroupHomeNode(node);
+      if (groupHomeNode == null) {
+        final String message = "Could not locate group home node.";
         sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, message,
             new IllegalStateException(message), response);
         return;
       }
-      final String sitePath = siteNode.getPath();
-      final String contextId = contextIdResolver.resolveContextId(siteNode);
+      final String sitePath = groupHomeNode.getPath();
+      final String contextId = contextIdResolver.resolveContextId(groupHomeNode);
       if (contextId == null) {
         throw new IllegalStateException("Could not resolve context_id!");
       }
+      Node groupProfileNode = groupHomeNode.getNode("public/authprofile");
       launchProps.put(CONTEXT_ID, contextId);
-      launchProps.put(CONTEXT_TITLE, siteNode.getProperty("name").getString());
-      launchProps.put(CONTEXT_LABEL, siteNode.getProperty("id").getString());
+      launchProps.put(CONTEXT_TITLE, groupProfileNode.getProperty("sakai:group-title").getString());
+      launchProps.put(CONTEXT_LABEL, groupProfileNode.getProperty("sakai:group-id").getString());
 
       // FIXME how to determine site type?
       // CourseSection probably satisfies 90% of our use cases.
@@ -415,7 +415,7 @@ public class BasicLTIConsumerServlet extends SlingAllMethodsServlet {
           .privilegeFromName(Privilege.JCR_MODIFY_ACCESS_CONTROL) };
       boolean canManageSite = accessControlManager.hasPrivileges(sitePath, modifyACLs);
       LOG.info("hasPrivileges(modifyAccessControl)=" + canManageSite);
-      if ("anonymous".equals(session.getUserID())) {
+      if (UserConstants.ANON_USERID.equals(session.getUserID())) {
         launchProps.put(ROLES, "None");
       } else if (canManageSite) {
         launchProps.put(ROLES, "Instructor");
@@ -992,14 +992,14 @@ public class BasicLTIConsumerServlet extends SlingAllMethodsServlet {
    * @throws AccessDeniedException
    * @throws RepositoryException
    */
-  private Node findSiteNode(final Node startingNode) throws ValueFormatException,
+  private Node findGroupHomeNode(final Node startingNode) throws ValueFormatException,
       PathNotFoundException, ItemNotFoundException, AccessDeniedException,
       RepositoryException {
     Node returnNode = null;
     Node traversalNode = startingNode;
     while (traversalNode.getDepth() != 0) {
       if (traversalNode.hasProperty("sling:resourceType")) {
-        if ("sakai/site".equals(traversalNode.getProperty("sling:resourceType")
+        if ("sakai/group-home".equals(traversalNode.getProperty("sling:resourceType")
             .getString())) {
           // found the parent site node
           returnNode = traversalNode;

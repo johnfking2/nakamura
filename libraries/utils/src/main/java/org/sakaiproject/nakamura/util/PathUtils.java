@@ -19,7 +19,6 @@ package org.sakaiproject.nakamura.util;
 
 import org.apache.jackrabbit.api.security.principal.ItemBasedPrincipal;
 import org.apache.jackrabbit.api.security.user.Authorizable;
-import org.sakaiproject.nakamura.api.resource.SubPathProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -391,36 +390,12 @@ public class PathUtils {
     String s = String.valueOf(value);
     if (s != null && s.length() > 4) {
       if (s.charAt(0) == '/' && s.charAt(1) == '_') {
-        String id = null;
-        if (s.startsWith("/_user/") || s.startsWith("/_group/")) {
-          int slash = s.indexOf('/', 2);
-          while (slash > 0) {
-            int nslash = s.indexOf('/', slash + 1);
-            String nid = null;
-            if (nslash > 0) {
-              nid = s.substring(slash + 1, nslash);
-            } else {
-              nid = s.substring(slash + 1);
-            }
-            if (id == null) {
-              id = nid;
-            } else if (nid.equals(id)) {
-              // a quirk of Jackrabbit: a 3-character id has an additional intermediate directory
-              // /~ieb equals /_user/i/ie/ieb/ieb
-              if (id.length() > 3) {
-                return "/~" + id + "/"+ s.substring(slash + 1);
-              } else {
-                return "/~" + id + s.substring(slash + 1 + id.length());
-              }
-            } else if (!nid.startsWith(id)) {
-              return "/~" + id+ "/" + s.substring(slash + 1);
-            }
-            slash = nslash;
-            id = nid;
-          }
-          if ( id != null && id.length() > 0) {
-            return "/~" + id;
-          }
+        if ( s.length() > 16 && s.startsWith("/_user/")) {
+          return "/~"+s.substring(16);
+        } else if ( s.length() > 17 && s.startsWith("/_group/")) {
+          return "/~"+s.substring(17);
+        } else if ( s.startsWith("a:")) {
+          return "/~"+s.substring(2); // sparse
         }
       }
     }

@@ -44,7 +44,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Vector;
 
 import javax.jcr.Node;
 import javax.jcr.PropertyIterator;
@@ -141,7 +140,7 @@ public class PresenceContactsServletTest extends AbstractEasyMockTest {
     UserManager um = createUserManager(null, true, authorizables.toArray(auths));
     expect(session.getUserManager()).andReturn(um).anyTimes();
     expect(
-        connectionManager.getConnectedUsers(CURRENT_USER,
+        connectionManager.getConnectedUsers(request, CURRENT_USER,
             ConnectionState.ACCEPTED)).andReturn(contacts);
 
     servlet.presenceService = presenceService;

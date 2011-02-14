@@ -70,7 +70,6 @@ import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
-@SuppressWarnings("restriction")
 @SlingServlet(methods = { "POST" }, resourceTypes = { "sling/servlet/default" }, selectors = { "sitearchive" })
 @Properties(value = {
     @Property(name = "service.description", value = "Imports one or more SiteArchive ZIP files from Sakai 2"),
@@ -356,7 +355,7 @@ public class ImportSiteArchiveServlet extends SlingAllMethodsServlet {
       Binary content = valueFactory.createBinary(in);
       node.setProperty(JcrConstants.JCR_CONTENT, content);
       final String linkPath = sitePath + "/_files/" + fileName;
-      FileUtils.createLink(node, linkPath, sitePath, slingRepository);
+      FileUtils.createLink(node, linkPath, slingRepository);
     } catch (RepositoryException e) {
       throw new Error(e);
     } catch (IOException e) {

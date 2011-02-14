@@ -44,13 +44,14 @@ import org.sakaiproject.nakamura.api.doc.ServiceBinding;
 import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
+import org.sakaiproject.nakamura.api.lite.jackrabbit.JackrabbitSparseUtils;
+import org.sakaiproject.nakamura.api.message.LiteMessagingService;
 import org.sakaiproject.nakamura.api.message.MessagingException;
-import org.sakaiproject.nakamura.api.message.MessagingService;
-import org.sakaiproject.nakamura.api.personal.PersonalUtils;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
 import org.sakaiproject.nakamura.api.user.UserConstants;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.sakaiproject.nakamura.util.PathUtils;
+import org.sakaiproject.nakamura.util.PersonalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +63,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.Map.Entry;
 
 import javax.jcr.Node;
 import javax.jcr.NodeIterator;
@@ -93,7 +94,7 @@ import javax.servlet.http.HttpServletResponse;
         + "\"jcr:primaryType\":\"nt:unstructured\"}\n" + "}<pre>"),
     @ServiceResponse(code = 401, description = "Unauthorized: credentials provided were not acceptable to return information for."),
     @ServiceResponse(code = 500, description = "Unable to return information about current user.") }))
-@SlingServlet(paths = { "/system/me" }, generateComponent = true, generateService = true, methods = { "GET" })
+@SlingServlet(paths = { "/system/jackrabbitme" }, generateComponent = true, generateService = true, methods = { "GET" })
 public class MeServlet extends SlingSafeMethodsServlet {
 
   private static final long serialVersionUID = -3786472219389695181L;
@@ -102,7 +103,7 @@ public class MeServlet extends SlingSafeMethodsServlet {
   private static final String TIMEZONE_FIELD = "timezone";
 
   @Reference
-  protected transient MessagingService messagingService;
+  protected transient LiteMessagingService messagingService;
 
   @Reference
   protected transient ConnectionManager connectionManager;
@@ -130,7 +131,7 @@ public class MeServlet extends SlingSafeMethodsServlet {
       writer.object();
       // User info
       writer.key("user");
-      writeUserJSON(writer, session, au);
+      writeUserJSON(writer, session, au, request);
 
       // Dump this user his info
       writer.key("profile");
@@ -217,7 +218,7 @@ public class MeServlet extends SlingSafeMethodsServlet {
     try {
       // This could just use ConnectionUtils.getConnectionPathBase, but that util class is
       // in the private package unfortunately.
-      String store = PersonalUtils.getHomeFolder(au) + "/"
+      String store = PersonalUtils.getHomePath(au) + "/"
           + ConnectionConstants.CONTACT_STORE_NAME;
       store = ISO9075.encodePath(store);
       StringBuilder statement = new StringBuilder("/jcr:root");
@@ -286,7 +287,7 @@ public class MeServlet extends SlingSafeMethodsServlet {
     // Get the path to the store for this user.
     long count = 0;
     try {
-      String store = messagingService.getFullPathToStore(au.getID(), session);
+      String store = messagingService.getFullPathToStore(au.getID(), JackrabbitSparseUtils.getSparseSession(session));
       store = ISO9075.encodePath(store);
       StringBuilder statement = new StringBuilder("/jcr:root");
       statement.append(store);
@@ -317,7 +318,8 @@ public class MeServlet extends SlingSafeMethodsServlet {
    * @throws JSONException
    */
   protected void writeUserJSON(ExtendedJSONWriter write, Session session,
-      Authorizable authorizable) throws RepositoryException, JSONException {
+      Authorizable authorizable, SlingHttpServletRequest request)
+      throws RepositoryException, JSONException {
 
     String user = session.getUserID();
     boolean isAnonymous = (UserConstants.ANON_USERID.equals(user));
@@ -338,7 +340,7 @@ public class MeServlet extends SlingSafeMethodsServlet {
 
       write.object();
       writeGeneralInfo(write, authorizable, subjects, properties);
-      writeLocale(write, properties);
+      writeLocale(write, properties, request);
       write.endObject();
     }
 
@@ -351,11 +353,11 @@ public class MeServlet extends SlingSafeMethodsServlet {
    * @param properties
    * @throws JSONException
    */
-  protected void writeLocale(ExtendedJSONWriter write, Map<String, Object> properties)
-      throws JSONException {
+  protected void writeLocale(ExtendedJSONWriter write, Map<String, Object> properties,
+      SlingHttpServletRequest request) throws JSONException {
 
     /* Get the correct locale */
-    Locale l = Locale.getDefault();
+    Locale l = request.getLocale();
     if (properties.containsKey(LOCALE_FIELD)) {
       String locale[] = properties.get(LOCALE_FIELD).toString().split("_");
       if (locale.length == 2) {

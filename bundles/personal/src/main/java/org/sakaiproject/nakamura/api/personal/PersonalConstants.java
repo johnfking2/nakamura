@@ -17,27 +17,21 @@
  */
 package org.sakaiproject.nakamura.api.personal;
 
+import org.sakaiproject.nakamura.util.LitePersonalUtils;
+
 /**
  *
  */
 public interface PersonalConstants {
 
   /**
-   * The base location of the user space.
-   */
-  public static final String _USER = "/_user";
-  /**
-   * The base location of the group space.
-   */
-  public static final String _GROUP = "/_group";
-  /**
    * The name of the private folder
    */
-  public static final String PRIVATE = "private";
+  public static final String PRIVATE = LitePersonalUtils.PATH_PRIVATE;
   /**
    * The name of the public folder
    */
-  public static final String PUBLIC = "public";
+  public static final String PUBLIC = LitePersonalUtils.PATH_PUBLIC;
 
   /**
    * The resource type of personal private stores.
@@ -65,17 +59,17 @@ public interface PersonalConstants {
   /**
    * The node name of the authentication profile in public space.
    */
-  public static final String AUTH_PROFILE = "authprofile";
+  public static final String AUTH_PROFILE = LitePersonalUtils.PATH_AUTH_PROFILE;
 
   /**
    * Property name for the e-mail property of a user's profile
    */
-  public static final String EMAIL_ADDRESS = "email";
+  public static final String EMAIL_ADDRESS = LitePersonalUtils.PROP_EMAIL_ADDRESS;
 
   /**
    * Property name for the user's preferred means of message delivery
    */
-  public static final String PREFERRED_MESSAGE_TRANSPORT = "preferredMessageTransport";
+  public static final String PREFERRED_MESSAGE_TRANSPORT = LitePersonalUtils.PROP_PREFERRED_MESSAGE_TRANSPORT;
 
   /**
    * Parameter which can deliver a JSON string to a content importer to configure a new profile.

@@ -20,10 +20,9 @@ package org.sakaiproject.nakamura.api.activity;
 import static org.sakaiproject.nakamura.api.activity.ActivityConstants.EVENT_TOPIC;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.osgi.service.event.Event;
-import org.sakaiproject.nakamura.api.personal.PersonalUtils;
 import org.sakaiproject.nakamura.api.user.UserConstants;
+import org.sakaiproject.nakamura.util.LitePersonalUtils;
 import org.sakaiproject.nakamura.util.PathUtils;
 
 import java.io.UnsupportedEncodingException;
@@ -48,21 +47,21 @@ public class ActivityUtils {
     map.put(ActivityConstants.EVENT_PROP_PATH, activityItemPath);
     return new Event(EVENT_TOPIC, (Dictionary) map);
   }
-  
+
   /**
    * Returns the path to the activity feed for a user.
-   * 
+   *
    * @param user
    * @return
    */
-  public static String getUserFeed(Authorizable user) {
-    return PersonalUtils.getPrivatePath(user) + "/"
+  public static String getUserFeed(String user) {
+    return LitePersonalUtils.getPrivatePath(user) + "/"
         + ActivityConstants.ACTIVITY_FEED_NAME;
   }
 
   /**
    * Get the path from an activity id.
-   * 
+   *
    * @param id
    *          The ID for an activity.
    * @param startPath

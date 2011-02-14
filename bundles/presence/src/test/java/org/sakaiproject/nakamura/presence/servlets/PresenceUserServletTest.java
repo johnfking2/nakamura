@@ -36,8 +36,8 @@ import org.mockito.Mockito;
 import org.sakaiproject.nakamura.api.connections.ConnectionManager;
 import org.sakaiproject.nakamura.api.connections.ConnectionState;
 import org.sakaiproject.nakamura.api.presence.PresenceService;
+import org.sakaiproject.nakamura.api.presence.PresenceUtils;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
-import org.sakaiproject.nakamura.api.user.UserConstants;
 import org.sakaiproject.nakamura.presence.PresenceServiceImplTest;
 import org.sakaiproject.nakamura.testutils.easymock.AbstractEasyMockTest;
 
@@ -65,6 +65,7 @@ public class PresenceUserServletTest extends AbstractEasyMockTest {
   private ConnectionManager connectionManager;
   private ProfileService profileService;
 
+  @Override
   @Before
   public void setUp() throws Exception {
     super.setUp();
@@ -94,7 +95,7 @@ public class PresenceUserServletTest extends AbstractEasyMockTest {
     SlingHttpServletRequest request = createMock(SlingHttpServletRequest.class);
     SlingHttpServletResponse response = createMock(SlingHttpServletResponse.class);
     ResourceResolver resourceResolver = createMock(ResourceResolver.class);
-    expect(request.getRemoteUser()).andReturn(UserConstants.ANON_USERID);
+    expect(request.getRemoteUser()).andReturn(PresenceUtils.ANON_USERID);
     expect(request.getResourceResolver()).andReturn(resourceResolver);
     expect(resourceResolver.adaptTo(Session.class)).andReturn(null);
     response.sendError(401, "User must be logged in to check their status");
@@ -151,7 +152,7 @@ public class PresenceUserServletTest extends AbstractEasyMockTest {
     expect(request.getRemoteUser()).andReturn(CURRENT_USER);
     expect(session.getUserID()).andReturn(CURRENT_USER);
     expect(request.getParameter("userid")).andReturn(contact);
-    bindConnectionManager();
+    bindConnectionManager(request);
     response.setContentType("application/json");
     response.setCharacterEncoding("UTF-8");
     expect(response.getWriter()).andReturn(printWriter);
@@ -179,7 +180,7 @@ public class PresenceUserServletTest extends AbstractEasyMockTest {
     expect(resourceResolver.adaptTo(Session.class)).andReturn(session);
     expect(session.getUserID()).andReturn(CURRENT_USER);
     expect(request.getParameter("userid")).andReturn(contact);
-    bindConnectionManager();
+    bindConnectionManager(request);
     response.sendError(HttpServletResponse.SC_FORBIDDEN,
         "Userid must be a contact.");
 
@@ -188,13 +189,13 @@ public class PresenceUserServletTest extends AbstractEasyMockTest {
 
   }
 
-  public void bindConnectionManager() {
+  public void bindConnectionManager(SlingHttpServletRequest request) {
     connectionManager = createMock(ConnectionManager.class);
     List<String> friends = new ArrayList<String>();
     for (int i = 0; i < 50; i++) {
       friends.add("user-" + i);
     }
-    expect(connectionManager.getConnectedUsers(CURRENT_USER, ConnectionState.ACCEPTED)).andReturn(
+    expect(connectionManager.getConnectedUsers(request, CURRENT_USER, ConnectionState.ACCEPTED)).andReturn(
         friends);
     servlet.connectionManager = connectionManager;
   }

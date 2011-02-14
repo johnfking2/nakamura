@@ -17,7 +17,6 @@
  */
 package org.sakaiproject.nakamura.activity;
 
-import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.junit.Assert;
 import org.junit.Test;
 import org.sakaiproject.nakamura.api.activity.ActivityConstants;
@@ -39,10 +38,9 @@ public class ActivityUtilsTest extends AbstractEasyMockTest{
   @Test
   public void testUserFeed() throws RepositoryException {
     String user = "admin";
-    Authorizable au = createAuthorizable(user, false, true);
-    String expected = "/_user/a/ad/admin/private/"
+    String expected = "a:admin/private/"
         + ActivityConstants.ACTIVITY_FEED_NAME;
-    String result = ActivityUtils.getUserFeed(au);
+    String result = ActivityUtils.getUserFeed(user);
     Assert.assertEquals(expected, result);
   }
 

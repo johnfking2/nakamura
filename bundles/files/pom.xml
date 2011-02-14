@@ -15,12 +15,12 @@
   <parent>
     <groupId>org.sakaiproject.nakamura</groupId>
     <artifactId>base</artifactId>
-    <version>0.9-SNAPSHOT</version>
+    <version>0.10-SNAPSHOT</version>
   </parent>
   <artifactId>org.sakaiproject.nakamura.files</artifactId>
   <packaging>bundle</packaging>
 
-  <version>0.9-SNAPSHOT</version>
+  <version>0.10-SNAPSHOT</version>
   <name>Sakai Nakamura :: Files Bundle</name>
   <description>Sakai files bundle</description>
   <build>
@@ -47,6 +47,11 @@
   <dependencies>
     <!-- sling and JCR -->
     <dependency>
+      <groupId>org.sakaiproject.nakamura</groupId>
+      <artifactId>org.apache.sling.jcr.jackrabbit.server</artifactId>
+      <version>2.1.0-0.10-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.jackrabbit</groupId>
       <artifactId>jackrabbit-api</artifactId>
       <version>2.0.0</version>
@@ -67,7 +72,19 @@
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.resource</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.sakaiproject.nakamura</groupId>
+      <artifactId>org.sakaiproject.nakamura.core</artifactId>
+      <version>0.10-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.sakaiproject.nakamura</groupId>
+      <artifactId>org.sakaiproject.nakamura.solr</artifactId>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -75,6 +92,11 @@
       <artifactId>org.apache.sling.api</artifactId>
       <version>2.0.6</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.collections</groupId>
+      <artifactId>google-collections</artifactId>
+      <version>0.8</version>
     </dependency>
     <!-- servlet -->
     <dependency>
@@ -86,6 +108,10 @@
     <dependency>
       <groupId>javax.jcr</groupId>
       <artifactId>jcr</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.solr</groupId>
+      <artifactId>solr-solrj</artifactId>
     </dependency>
     <!-- osgi -->
     <dependency>
@@ -117,72 +143,61 @@
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.personal</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.profile</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.search</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.locking</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.cluster</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.connections</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.doc</artifactId>
-      <version>0.9-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>org.sakaiproject.nakamura</groupId>
-      <artifactId>org.sakaiproject.nakamura.site</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.utils</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.jcr</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <!-- testing -->
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
-      <artifactId>org.apache.sling.jcr.jackrabbit.server</artifactId>
-      <version>2.1.0-0.9-SNAPSHOT</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.testutils</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>test</scope>
     </dependency>
     <dependency>

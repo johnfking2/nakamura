@@ -32,6 +32,7 @@ class TC_MySearchTest < Test::Unit::TestCase
     username = "unusualuser#{m}"
     create_user(username, "#{username}-firstname", "#{username}-lastname")
 
+    wait_for_indexer()
     result = @sm.search_for_user("#{username}")
     assert_not_nil(result, "Expected result back")
     users = result["results"]

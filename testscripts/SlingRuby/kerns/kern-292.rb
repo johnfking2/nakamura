@@ -11,8 +11,8 @@ include SlingSearch
 class TC_Kern292Test < Test::Unit::TestCase
   include SlingTest
 
-  def test_mutual_group_addition
-    m = Time.now.to_i.to_s
+  def test_add_member_acyclic
+    m = Time.now.to_f.to_s.gsub('.', '')
     g1 = create_group("g-testgroup1-#{m}")
     g2 = create_group("g-testgroup2-#{m}")
     @log.info("adding group #{g1.name} to #{g2.name} ")
@@ -23,11 +23,12 @@ class TC_Kern292Test < Test::Unit::TestCase
     res = g1.add_member(@s, g2.name, "group")
     assert_equal("200", res.code, "Expected second add to be Ok")
     members = g1.members(@s)
-    assert_equal(1, members.size, "Expected group to have no extra members")
+   # this test would be 1 with the JR user manager, but the sparse user manager does not maintain RI, perposfully
+    assert_equal(1, members.size, "Expected group to have no extra members #{members} ")
   end
 
-  def test_addition_is_transactional
-    m = Time.now.to_i.to_s
+  def test_add_members_acyclic
+    m = Time.now.to_f.to_s.gsub('.', '')
     g1 = create_group("g-testgroup3-#{m}")
     g2 = create_group("g-testgroup4-#{m}")
     @log.info("Adding #{g1.name} to #{g2.name} ")
@@ -38,14 +39,13 @@ class TC_Kern292Test < Test::Unit::TestCase
       create_user("#{u}-#{m}")
     end
     res = g1.add_members(@s, users.map { |u| u.name } << g2.name)
-    ##assert_equal("500", res.code, "Expected second add to fail"), in JR2 it only removes those users that are present and does not fail
     assert_equal("200", res.code, "Expected second add to be Ok")
 	members = g1.members(@s)
     assert_equal(4, members.size, "Expected group to only those members that it should have, bob, sam, jim, and the managers")
   end
 
-  def test_deletion_is_transactional
-    m = Time.now.to_i.to_s
+  def test_remove_ignores_nonmembers
+    m = Time.now.to_f.to_s.gsub('.', '')
     g1 = create_group("g-testgroup5-#{m}")
     users = [ "pav", "simon", "steve" ].collect do |u|
       create_user("#{u}-#{m}")

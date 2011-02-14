@@ -17,17 +17,16 @@
  */
 package org.sakaiproject.nakamura.profile;
 
-import static org.apache.sling.jcr.resource.JcrResourceConstants.SLING_RESOURCE_TYPE_PROPERTY;
+import com.google.common.collect.ImmutableMap.Builder;
+import com.google.common.collect.ImmutableMap;
+
 import static org.sakaiproject.nakamura.api.profile.ProfileConstants.GROUP_DESCRIPTION_PROPERTY;
-import static org.sakaiproject.nakamura.api.profile.ProfileConstants.GROUP_IDENTIFIER_PROPERTY;
-import static org.sakaiproject.nakamura.api.profile.ProfileConstants.GROUP_JCR_PATH_PREFIX;
-import static org.sakaiproject.nakamura.api.profile.ProfileConstants.GROUP_PROFILE_RT;
 import static org.sakaiproject.nakamura.api.profile.ProfileConstants.GROUP_TITLE_PROPERTY;
 import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_BASIC;
-import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_IDENTIFIER_PROPERTY;
-import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_JCR_PATH_PREFIX;
+import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_FIRSTNAME_PROPERTY;
+import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_LASTNAME_PROPERTY;
+import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_EMAIL_PROPERTY;
 import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_PICTURE;
-import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_PROFILE_RT;
 
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Reference;
@@ -36,16 +35,19 @@ import org.apache.felix.scr.annotations.ReferencePolicy;
 import org.apache.felix.scr.annotations.ReferenceStrategy;
 import org.apache.felix.scr.annotations.References;
 import org.apache.felix.scr.annotations.Service;
-import org.apache.jackrabbit.api.security.principal.ItemBasedPrincipal;
-import org.apache.jackrabbit.api.security.user.Authorizable;
-import org.apache.jackrabbit.api.security.user.UserManager;
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.api.wrappers.ValueMapDecorator;
-import org.apache.sling.jcr.base.util.AccessControlUtil;
-import org.apache.sling.jcr.resource.JcrPropertyMap;
+import org.sakaiproject.nakamura.api.lite.StorageClientException;
+import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
+import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
+import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
+import org.sakaiproject.nakamura.api.lite.authorizable.User;
+import org.sakaiproject.nakamura.api.lite.content.Content;
+import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.profile.ProfileProvider;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
 import org.sakaiproject.nakamura.api.profile.ProviderSettings;
+import org.sakaiproject.nakamura.util.LitePersonalUtils;
 import org.sakaiproject.nakamura.util.PathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +62,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.jcr.Node;
-import javax.jcr.NodeIterator;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 
@@ -75,77 +76,51 @@ public class ProfileServiceImpl implements ProfileService {
   private Map<String, ProfileProvider> providers = new ConcurrentHashMap<String, ProfileProvider>();
   private ProviderSettingsFactory providerSettingsFactory = new ProviderSettingsFactory();
   public static final Logger LOG = LoggerFactory.getLogger(ProfileServiceImpl.class);
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.sakaiproject.nakamura.api.profile.ProfileService#getHomePath(org.apache.jackrabbit.api.security.user.Authorizable)
-   */
-  public String getHomePath(Authorizable authorizable) {
-    String folder = PathUtils.getSubPath(authorizable);
-    if (authorizable != null && authorizable.isGroup()) {
-      folder = GROUP_JCR_PATH_PREFIX + folder;
-    } else {
-      folder = USER_JCR_PATH_PREFIX + folder;
-    }
-    return PathUtils.normalizePath(folder);
-  }
+  
+  private final String[] basicProfileElements = new String[] {USER_FIRSTNAME_PROPERTY, USER_LASTNAME_PROPERTY, USER_EMAIL_PROPERTY, USER_PICTURE};
+
+
 
   /**
    * {@inheritDoc}
-   *
-   * @see org.sakaiproject.nakamura.api.profile.ProfileService#getPrivatePath(org.apache.jackrabbit.api.security.user.Authorizable)
-   */
-  public String getPrivatePath(Authorizable authorizable) {
-    return getHomePath(authorizable) + "/private";
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.sakaiproject.nakamura.api.profile.ProfileService#getPublicPath(org.apache.jackrabbit.api.security.user.Authorizable)
-   */
-  public String getPublicPath(Authorizable authorizable) {
-    return getHomePath(authorizable) + "/public";
-  }
-
-  /**
-   *
-   * {@inheritDoc}
-   *
-   * @see org.sakaiproject.nakamura.api.profile.ProfileService#getProfilePath(org.apache.jackrabbit.api.security.user.Authorizable)
-   */
-  public String getProfilePath(Authorizable authorizable) {
-    return getPublicPath(authorizable) + "/authprofile";
-  }
-
-  /**
-   * {@inheritDoc}
+   * @throws StorageClientException 
+   * @throws AccessDeniedException 
    *
    * @see org.sakaiproject.nakamura.api.profile.ProfileService#getProfileMap(org.apache.jackrabbit.api.security.user.Authorizable,
    *      javax.jcr.Session)
    */
   public ValueMap getProfileMap(Authorizable authorizable, Session session)
-      throws RepositoryException {
-    String profilePath = getProfilePath(authorizable);
-    String relativePath = profilePath.substring(1);
-    ValueMap profileMap;
-    if (session.getRootNode().hasNode(relativePath)) {
-      Node profileNode = session.getNode(profilePath);
-      profileMap = getProfileMap(profileNode);
+      throws RepositoryException, StorageClientException, AccessDeniedException {
+    if (User.ANON_USER.equals(authorizable.getId())) {
+      return anonymousProfile();
+    }
+    String profilePath = LitePersonalUtils.getProfilePath(authorizable.getId());
+    org.sakaiproject.nakamura.api.lite.Session sparseSession = StorageClientUtils.adaptToSession(session);
+    ContentManager contentManager = sparseSession.getContentManager();
+    ValueMap profileMap = new ValueMapDecorator(new HashMap<String, Object>());
+    
+    if (contentManager.exists(profilePath)) {
+      Content profileContent = contentManager.get(profilePath);
+      profileMap.putAll(getProfileMap(profileContent, session));
+    }
+    profileMap.put(USER_BASIC, basicProfileMapForAuthorizable(authorizable));
+    if (authorizable.isGroup()) {
+      addGroupProperties(authorizable, profileMap);
     } else {
-      profileMap = null;
+      addUserProperties(authorizable, profileMap);
     }
     return profileMap;
   }
 
   /**
    * {@inheritDoc}
+   * @param jcrSession 
    *
    * @see org.sakaiproject.nakamura.api.profile.ProfileService#getProfileMap(javax.jcr.Node)
    */
-  public ValueMap getProfileMap(Node profileNode) throws RepositoryException {
+  public ValueMap getProfileMap(Content profileContent, Session jcrSession) throws RepositoryException {
     // Get the data from our external providers.
-    Map<String, List<ProviderSettings>> providersMap = scanForProviders(profileNode);
+    Map<String, List<ProviderSettings>> providersMap = scanForProviders(profileContent, jcrSession);
     Map<Node, Future<Map<String, Object>>> providedNodeData = new HashMap<Node, Future<Map<String, Object>>>();
     for (Entry<String, List<ProviderSettings>> e : providersMap.entrySet()) {
       ProfileProvider pp = providers.get(e.getKey());
@@ -156,7 +131,7 @@ public class ProfileServiceImpl implements ProfileService {
     try {
       // Return it as a ValueMap.
       ValueMap map = new ValueMapDecorator(new HashMap<String, Object>());
-      handleNode(profileNode, providedNodeData, map);
+      handleNode(profileContent, providedNodeData, map);
       return map;
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -168,7 +143,7 @@ public class ProfileServiceImpl implements ProfileService {
   /**
    * Fills the provided map with the JCR info and the external information.
    *
-   * @param node
+   * @param profileContent
    *          The node that should be merged with the external info. The entire nodetree
    *          will be checked.
    * @param baseMap
@@ -179,138 +154,117 @@ public class ProfileServiceImpl implements ProfileService {
    * @throws InterruptedException
    * @throws ExecutionException
    */
-  protected void handleNode(Node node, Map<Node, Future<Map<String, Object>>> baseMap,
+  protected void handleNode(Content profileContent, Map<Node, Future<Map<String, Object>>> baseMap,
       Map<String, Object> map) throws RepositoryException, InterruptedException,
       ExecutionException {
     // If our map contains this node, that means one of the provides had some information
     // for it.
     // We will use the provider.
-    if (baseMap.containsKey(node)) {
-      map.putAll(baseMap.get(node).get());
+    if (baseMap.containsKey(profileContent.getPath())) {
+      map.putAll(baseMap.get(profileContent.getPath()).get());
     } else {
 
       // The node wasn't found in the baseMap.
       // We just dump the JCR properties.
-      map.putAll(new JcrPropertyMap(node));
-      map.put("jcr:path", PathUtils.translateAuthorizablePath(node.getPath()));
-      map.put("jcr:name", node.getName());
+      map.putAll(profileContent.getProperties());
+      map.put("jcr:path", PathUtils.translateAuthorizablePath(profileContent.getPath()));
+      map.put("jcr:name", StorageClientUtils.getObjectName(profileContent.getPath()));
 
       // We loop over the child nodes, but each node get checked against the baseMap
       // again.
-      NodeIterator ni = node.getNodes();
-      for (; ni.hasNext();) {
-        Node childNode = ni.nextNode();
+      for (Content childProfile : profileContent.listChildren()) {
         ValueMap childMap = new ValueMapDecorator(new HashMap<String, Object>());
-        handleNode(childNode, baseMap, childMap);
-        map.put(childNode.getName(), childMap);
+        handleNode(childProfile, baseMap, childMap);
+        map.put(StorageClientUtils.getObjectName(childProfile.getPath()), childMap);
       }
     }
   }
 
   /**
    * {@inheritDoc}
+   * @throws AccessDeniedException 
+   * @throws StorageClientException 
    *
    * @see org.sakaiproject.nakamura.api.profile.ProfileService#getCompactProfileMap(org.apache.jackrabbit.api.security.user.Authorizable,
    *      javax.jcr.Session)
    */
   public ValueMap getCompactProfileMap(Authorizable authorizable, Session session)
-      throws RepositoryException {
-    // The map were we will stick the compact information in.
-    ValueMap compactProfile;
+      throws RepositoryException, StorageClientException, AccessDeniedException {
+    if (User.ANON_USER.equals(authorizable.getId())) {
+      return anonymousProfile();
+    }
+    
+    ValueMap compactProfile = new ValueMapDecorator(new HashMap<String, Object>());
+    compactProfile.put(USER_BASIC, basicProfileMapForAuthorizable(authorizable));
 
-    // Get the entire profile.
-    ValueMap profile = getProfileMap(authorizable, session);
-    if (profile == null) {
-      compactProfile = null;
+    if (authorizable.isGroup()) {
+      addGroupProperties(authorizable, compactProfile);
     } else {
-      compactProfile = new ValueMapDecorator(new HashMap<String, Object>());
-
-      if (authorizable.isGroup()) {
-        // For a group we just dump it's title and description.
-        compactProfile.put("groupid", authorizable.getID());
-        compactProfile.put(GROUP_TITLE_PROPERTY, profile.get(GROUP_TITLE_PROPERTY));
-        compactProfile.put(GROUP_DESCRIPTION_PROPERTY, profile
-            .get(GROUP_DESCRIPTION_PROPERTY));
-      } else {
-        compactProfile.put(USER_PICTURE, profile.get(USER_PICTURE));
-
-        try{
-          ValueMap basicMap =(ValueMap) profile.get(USER_BASIC);
-          if ( basicMap != null ) {
-            compactProfile.put(USER_BASIC, basicMap);
-          } else {
-            LOG.warn("User {} has no basic profile (firstName, lastName and email not avaiable) ",authorizable.getID());
-          }
-        }catch(Exception e){
-          LOG.warn("Can't get authprofile basic information. ", e);
-        }
-        // Backward compatible reasons.
-        compactProfile.put("userid", authorizable.getID());
-        compactProfile.put("hash", getUserHashedPath(authorizable));
-      }
+      addUserProperties(authorizable, compactProfile);
     }
     return compactProfile;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.sakaiproject.nakamura.api.profile.ProfileService#getCompactProfileMap(javax.jcr.Node)
-   */
-  public ValueMap getCompactProfileMap(Node profileNode) throws RepositoryException {
-    // Get the authorizable from the profile node.
-    Session session = profileNode.getSession();
-    UserManager um = AccessControlUtil.getUserManager(session);
-    Authorizable authorizable = null;
-    if (profileNode.hasProperty(SLING_RESOURCE_TYPE_PROPERTY)) {
-      if (USER_PROFILE_RT.equals(profileNode.getProperty(SLING_RESOURCE_TYPE_PROPERTY)
-          .getString())) {
-        String user = profileNode.getProperty(USER_IDENTIFIER_PROPERTY).getString();
-        authorizable = um.getAuthorizable(user);
-      }
-      if (GROUP_PROFILE_RT.equals(profileNode.getProperty(SLING_RESOURCE_TYPE_PROPERTY)
-          .getString())) {
-        String group = profileNode.getProperty(GROUP_IDENTIFIER_PROPERTY).getString();
-        authorizable = um.getAuthorizable(group);
-      }
-    }
-    if (authorizable == null) {
-      throw new RepositoryException("The provided node is not a profile node.");
-    }
-
-    return getCompactProfileMap(authorizable, session);
+  private void addUserProperties(Authorizable user, ValueMap profileMap) {
+    // Backward compatible reasons.
+    profileMap.put("rep:userId", user.getId());
+    profileMap.put("userid", user.getId());
+    profileMap.put("hash", user.getId());
   }
+
+  private void addGroupProperties(Authorizable group, ValueMap profileMap) {
+    // For a group we just dump it's title and description.
+    profileMap.put("groupid", group.getId());
+    profileMap.put("sakai:group-id", group.getId());
+    profileMap.put(GROUP_TITLE_PROPERTY, group.getProperty(GROUP_TITLE_PROPERTY));
+    profileMap.put(GROUP_DESCRIPTION_PROPERTY, group
+        .getProperty(GROUP_DESCRIPTION_PROPERTY));
+  }
+
+  private ValueMap basicProfileMapForAuthorizable(Authorizable authorizable) {
+    Builder<String, String> propertyBuilder = ImmutableMap.builder();
+    for (String profileElementName : basicProfileElements) {
+      if (authorizable.hasProperty(profileElementName)) {
+        propertyBuilder.put(profileElementName, (String)authorizable.getProperty(profileElementName));
+      }
+    }
+    // The map were we will stick the compact information in.
+    ValueMap compactProfile = basicProfile(propertyBuilder.build());
+    return compactProfile;
+  }
+
 
   /**
    * Loops over an entire profile and checks if some of the nodes are marked as external.
    * If there is a node found that has it's sakai:source property set to external, we'll
    * look for a ProfileProvider that matches that path.
    *
-   * @param baseNode
+   * @param profileContent
    *          The top node of a profile.
+   * @param jcrSession 
    * @return
    * @throws RepositoryException
    */
-  private Map<String, List<ProviderSettings>> scanForProviders(Node baseNode)
+  private Map<String, List<ProviderSettings>> scanForProviders(Content profileContent, Session jcrSession)
       throws RepositoryException {
     Map<String, List<ProviderSettings>> providerMap = new HashMap<String, List<ProviderSettings>>();
-    return scanForProviders("", baseNode, providerMap);
+    return scanForProviders("", profileContent, providerMap, jcrSession);
   }
 
   /**
    * @param path
-   * @param node
+   * @param profileContent
    * @param providerMap
+   * @param jcrSession 
    * @return
    * @throws RepositoryException
    */
-  private Map<String, List<ProviderSettings>> scanForProviders(String path, Node node,
-      Map<String, List<ProviderSettings>> providerMap) throws RepositoryException {
-    ProviderSettings settings = providerSettingsFactory.newProviderSettings(path, node);
+  private Map<String, List<ProviderSettings>> scanForProviders(String path, Content profileContent,
+      Map<String, List<ProviderSettings>> providerMap, Session jcrSession) throws RepositoryException {
+    ProviderSettings settings = providerSettingsFactory.newProviderSettings(path, profileContent, jcrSession);
     if (settings == null) {
-      for (NodeIterator ni = node.getNodes(); ni.hasNext();) {
-        Node newNode = ni.nextNode();
-        scanForProviders(appendPath(path, newNode.getName()), newNode, providerMap);
+      for (Content childProfileContent : profileContent.listChildren()) {
+        scanForProviders(StorageClientUtils.newPath(path, StorageClientUtils.getObjectName(childProfileContent.getPath())), childProfileContent, providerMap, jcrSession);
       }
     } else {
 
@@ -325,34 +279,6 @@ public class ProfileServiceImpl implements ProfileService {
     return providerMap;
   }
 
-  /**
-   * @param string
-   * @param name
-   * @return
-   */
-  private String appendPath(String path, String name) {
-    if (path.endsWith("/")) {
-      return path + name;
-    }
-    return path + "/" + name;
-  }
-
-  /**
-   * @param au
-   *          The authorizable to get the hashed path for.
-   * @return The hashed path (ex: a/ad/adm/admi/admin/)
-   * @throws RepositoryException
-   */
-  private static String getUserHashedPath(Authorizable au) throws RepositoryException {
-    String hash = null;
-    if (au.hasProperty("path")) {
-      hash = au.getProperty("path")[0].getString();
-    } else {
-      ItemBasedPrincipal principal = (ItemBasedPrincipal) au.getPrincipal();
-      hash = principal.getPath();
-    }
-    return hash;
-  }
 
   protected void bindProfileProvider(ProfileProvider provider,
       Map<String, Object> properties) {
@@ -370,5 +296,47 @@ public class ProfileServiceImpl implements ProfileService {
     if (name != null) {
       providers.remove(name);
     }
+  }
+
+  public ValueMap getProfileMap(
+      org.apache.jackrabbit.api.security.user.Authorizable authorizable, Session session) throws RepositoryException {
+    org.sakaiproject.nakamura.api.lite.Session sparseSession = StorageClientUtils.adaptToSession(session);
+    try {
+      return getProfileMap(sparseSession.getAuthorizableManager().findAuthorizable(authorizable.getID()), session);
+    } catch (StorageClientException e) {
+      throw new RepositoryException(e.getMessage(), e);
+    } catch (AccessDeniedException e) {
+      throw new RepositoryException(e.getMessage(), e);
+    }
+  }
+
+  public ValueMap getCompactProfileMap(
+      org.apache.jackrabbit.api.security.user.Authorizable authorizable, Session session) throws RepositoryException {
+    org.sakaiproject.nakamura.api.lite.Session sparseSession = StorageClientUtils.adaptToSession(session);
+    try {
+      return getCompactProfileMap(sparseSession.getAuthorizableManager().findAuthorizable(authorizable.getID()), session);
+    } catch (StorageClientException e) {
+      throw new RepositoryException(e.getMessage(), e);
+    } catch (AccessDeniedException e) {
+      throw new RepositoryException(e.getMessage(), e);
+    }
+  }
+  
+  private ValueMap basicProfile(Map<String, String> elementsMap) {
+    ValueMap basic = new ValueMapDecorator(new HashMap<String, Object>());
+    ValueMap elements = new ValueMapDecorator(new HashMap<String, Object>());
+    for (String key : elementsMap.keySet()) {
+      elements.put(key, new ValueMapDecorator(ImmutableMap.of("value", (Object) elementsMap.get(key))));
+    }
+    basic.put("elements", elements);
+    return basic;
+  }
+  
+  private ValueMap anonymousProfile() {
+    ValueMap rv = new ValueMapDecorator(new HashMap<String, Object>());
+    rv.put("rep:userId", User.ANON_USER);
+    rv.put(USER_BASIC, basicProfile(
+        ImmutableMap.of(USER_FIRSTNAME_PROPERTY, "Anonymous", USER_LASTNAME_PROPERTY, "User", USER_EMAIL_PROPERTY, "anon@sakai.invalid")));
+    return rv;
   }
 }

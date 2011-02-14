@@ -1,0 +1,12 @@
+{
+  "sakai:query-template": "path:/activity/group AND resourceType:sakai/resource-update",
+  "sakai:query-template-options": {
+      "sort": "${sortOn} ${sortOrder}"
+  },
+  "sortOn": "timestamp",
+  "sortOrder": "desc",
+  "sling:resourceType": "sakai/solr-search",
+  "sakai:batchresultprocessor": "MostActiveGroups",
+  "sakai:title": "Groups - Most Active",
+  "sakai:shortDescription": "Returns feed of most active group."
+}

@@ -4,8 +4,9 @@
 # don't forget to trust the svn certificate permanently: svn info https://source.sakaiproject.org/svn
 
 export K2_TAG="HEAD"
-export S2_TAG="tags/sakai-2.8.0-a02"
+export S2_TAG="branches/sakai-2.8.x"
 export UX_TAG="HEAD"
+export HYBRID_TAG="branches/hybrid-1.1.x"
 
 # Treat unset variables as an error when performing parameter expansion
 set -o nounset
@@ -85,12 +86,12 @@ else
     cd 3akai-ux
     git checkout -b "build-$UX_TAG" $UX_TAG
     # enable My Sakai 2 Sites widget
-    # // "personalportal":true --> "personalportal":true,
-    perl -pwi -e 's/\/\/\s+"personalportal"\:true/"personalportal"\:true\,/gi' devwidgets/s23courses/config.json
-    # //"grouppages":true, --> "grouppages":true,
-    perl -pwi -e 's/\/\/"grouppages"\:true\,/"grouppages"\:true\,/gi' devwidgets/sakai2tools/config.json
-    # //"grouppages":true, --> "grouppages":true,
-    perl -pwi -e 's/\/\/"grouppages"\:true\,/"grouppages"\:true\,/gi' devwidgets/basiclti/config.json
+    # "personalportal":false --> "personalportal":true
+    perl -pwi -e 's/"personalportal"\s*\:\s*false/"personalportal"\:true/gi' devwidgets/mysakai2/config.json
+    # "showSakai2" : false --> "showSakai2" : true
+    perl -pwi -e 's/showSakai2\s*\:\s*false/showSakai2 \: true/gi' dev/configuration/config.js
+    # "useLiveSakai2Feeds" : false --> "useLiveSakai2Feeds" : true
+    perl -pwi -e 's/useLiveSakai2Feeds\s*\:\s*false/useLiveSakai2Feeds \: true/gi' dev/configuration/config.js
     mvn -B -e clean install
     date > ../.lastbuild
 fi
@@ -115,11 +116,11 @@ fi
 echo "Starting sakai3 instance..."
 cd app/target/
 K2_ARTIFACT=`find . -name "org.sakaiproject.nakamura.app*[^sources].jar"`
-# configure TrustedLoginTokenProxyPreProcessor the hackish way...
-mkdir -p sling/config/org/sakaiproject/nakamura/proxy
-echo 'port=I"8080"' > sling/config/org/sakaiproject/nakamura/proxy/TrustedLoginTokenProxyPreProcessor.config
-echo 'sharedSecret="e2KS54H35j6vS5Z38nK40"' >> sling/config/org/sakaiproject/nakamura/proxy/TrustedLoginTokenProxyPreProcessor.config
-echo 'service.pid="org.sakaiproject.nakamura.proxy.TrustedLoginTokenProxyPreProcessor"' >> sling/config/org/sakaiproject/nakamura/proxy/TrustedLoginTokenProxyPreProcessor.config
+# configure TrustedLoginTokenProxyPreProcessor via file install
+mkdir -p load
+echo 'sharedSecret=e2KS54H35j6vS5Z38nK40' > load/org.sakaiproject.nakamura.proxy.TrustedLoginTokenProxyPreProcessor.cfg
+echo 'port=8080' >> load/org.sakaiproject.nakamura.proxy.TrustedLoginTokenProxyPreProcessor.cfg
+echo 'hostname=localhost' >> load/org.sakaiproject.nakamura.proxy.TrustedLoginTokenProxyPreProcessor.cfg
 java $K2_OPTS -jar $K2_ARTIFACT -p 8008 -f - > $BUILD_DIR/logs/sakai3-run.log.txt 2>&1 &
 
 # build sakai 2
@@ -130,8 +131,8 @@ then
 else
     echo "Building sakai2/$S2_TAG..."
     # untar tomcat
-    tar -xzf apache-tomcat-5.5.30.tar.gz 
-    mv apache-tomcat-5.5.30 sakai2-demo
+    tar -xzf apache-tomcat-5.5.31.tar.gz
+    mv apache-tomcat-5.5.31 sakai2-demo
     mkdir -p sakai2-demo/sakai
     svn checkout -q "https://source.sakaiproject.org/svn/sakai/$S2_TAG" sakai
     cd sakai/
@@ -143,22 +144,24 @@ else
     # rm -rf providers
     # svn checkout -q https://source.sakaiproject.org/svn/providers/branches/SAK-17222-2.7 providers
     # enable NakamuraUserDirectoryProvider
-    perl -pwi -e 's/<\/beans>/\t<bean id="org.sakaiproject.user.api.UserDirectoryProvider"\n\t\tclass="org.sakaiproject.provider.user.NakamuraUserDirectoryProvider"\n\t\tinit-method="init">\n\t\t<property name="threadLocalManager">\n\t\t\t<ref bean="org.sakaiproject.thread_local.api.ThreadLocalManager" \/>\n\t\t<\/property>\n\t<\/bean>\n<\/beans>/gi' providers/component/src/webapp/WEB-INF/components.xml
-    # # KERN-360 Servlet and TrustedLoginFilter RESTful services
-    # cp -R $BUILD_DIR/sakai3/nakamura/hybrid .
-    # find hybrid -name pom.xml -exec perl -pwi -e 's/2\.8-SNAPSHOT/2\.7\.1/g' {} \;
-    # perl -pwi -e 's/<\/modules>/<module>hybrid<\/module><\/modules>/gi' pom.xml
+    perl -pwi -e 's/<\/beans>/\t<bean id="org.sakaiproject.user.api.UserDirectoryProvider"\n\t\tclass="org.sakaiproject.provider.user.NakamuraUserDirectoryProvider"\n\t\tinit-method="init">\n\t\t<property name="threadLocalManager">\n\t\t\t<ref bean="org.sakaiproject.thread_local.api.ThreadLocalManager" \/>\n\t\t<\/property>\n\t\t<property name="serverConfigurationService">\n\t\t\t<ref bean="org.sakaiproject.component.api.ServerConfigurationService" \/>\n\t\t<\/property>\n\t<\/bean>\n<\/beans>/gi' providers/component/src/webapp/WEB-INF/components.xml
+    rm -f providers/component/src/webapp/WEB-INF/components-demo.xml
+    mvn -B -e clean install sakai:deploy -Dmaven.tomcat.home=$BUILD_DIR/sakai2-demo
+    # add hybrid webapp module
+    echo "\nBuilding hybrid/$HYBRID_TAG"
+    svn checkout -q https://source.sakaiproject.org/svn/hybrid/$HYBRID_TAG hybrid
+    cd hybrid
     mvn -B -e clean install sakai:deploy -Dmaven.tomcat.home=$BUILD_DIR/sakai2-demo
     # configure sakai 2 instance
     cd $BUILD_DIR
     # change default tomcat listener port numbers
-    perl -pwi -e 's/\<Connector\s+port\="8080"/\<Connector port\="8880"/gi' sakai2-demo/conf/server.xml
-    perl -pwi -e 's/\<Connector\s+port\="8009"/\<Connector port\="8809"/gi' sakai2-demo/conf/server.xml
+    perl -pwi -e 's/\<Connector\s+port\s*\=\s*"8080"/\<Connector port\="8880"/gi' sakai2-demo/conf/server.xml
+    perl -pwi -e 's/\<Connector\s+port\s*\=\s*"8009"/\<Connector port\="8809"/gi' sakai2-demo/conf/server.xml
     # sakai.properties
-    echo "ui.service = $S2_TAG on HSQLDB" >> sakai2-demo/sakai/sakai.properties
+    echo "ui.service = $S2_TAG + $HYBRID_TAG on HSQLDB" >> sakai2-demo/sakai/sakai.properties
     echo "version.sakai = $REPO_REV" >> sakai2-demo/sakai/sakai.properties
     echo "version.service = Built: $BUILD_DATE" >> sakai2-demo/sakai/sakai.properties
-    echo "serverName=sakai23-hybrid.sakaiproject.org" >> sakai2-demo/sakai/sakai.properties
+    echo "serverName=sakai3-nightly.uits.indiana.edu" >> sakai2-demo/sakai/sakai.properties
     echo "webservices.allowlogin=true" >> sakai2-demo/sakai/sakai.properties
     echo "webservice.portalsecret=nightly" >> sakai2-demo/sakai/sakai.properties
     echo "samigo.answerUploadRepositoryPath=/tmp/sakai2-hybrid/" >> sakai2-demo/sakai/sakai.properties
@@ -171,18 +174,21 @@ else
     echo "org.sakaiproject.provider.user.NakamuraUserDirectoryProvider.validateUrl=http://localhost:8008/var/cluster/user.cookie.json?c=" >> sakai2-demo/sakai/sakai.properties
     echo "x.sakai.token.localhost.sharedSecret=default-setting-change-before-use" >> sakai2-demo/sakai/sakai.properties
     # declare shared secret for trusted login from nakamura
-    echo "org.sakaiproject.util.TrustedLoginFilter.sharedSecret=e2KS54H35j6vS5Z38nK40" >> sakai2-demo/sakai/sakai.properties
-    echo "org.sakaiproject.util.TrustedLoginFilter.safeHosts=localhost;127.0.0.1;129.79.26.127" >> sakai2-demo/sakai/sakai.properties
+    echo "org.sakaiproject.hybrid.util.TrustedLoginFilter.sharedSecret=e2KS54H35j6vS5Z38nK40" >> sakai2-demo/sakai/sakai.properties
+    echo "org.sakaiproject.hybrid.util.TrustedLoginFilter.safeHosts=localhost;127.0.0.1;0:0:0:0:0:0:0:1%0;129.79.26.127" >> sakai2-demo/sakai/sakai.properties
     # enabled Basic LTI provider
     echo "imsblti.provider.enabled=true" >> sakai2-demo/sakai/sakai.properties
     echo "imsblti.provider.allowedtools=sakai.forums:sakai.messages:sakai.synoptic.messagecenter:sakai.poll:sakai.profile:sakai.profile2:sakai.announcements:sakai.synoptic.announcement:sakai.assignment.grades:sakai.summary.calendar:sakai.schedule:sakai.chat:sakai.dropbox:sakai.resources:sakai.gradebook.tool:sakai.help:sakai.mailbox:sakai.news:sakai.podcasts:sakai.postem:sakai.site.roster:sakai.rwiki:sakai.syllabus:sakai.singleuser:sakai.samigo:sakai.sitestats" >> sakai2-demo/sakai/sakai.properties
     echo "imsblti.provider.12345.secret=secret" >> sakai2-demo/sakai/sakai.properties
     echo "webservices.allow=.+" >> sakai2-demo/sakai/sakai.properties
-    # enable debugging for UDP
-    echo "log.config.count=3" >> sakai2-demo/sakai/sakai.properties
+    # enable debugging for hybrid related code
+    echo "log.config.count=6" >> sakai2-demo/sakai/sakai.properties
     echo "log.config.1 = ALL.org.sakaiproject.log.impl" >> sakai2-demo/sakai/sakai.properties
-    echo "log.config.2 = OFF.org.sakaiproject" >> sakai2-demo/sakai/sakai.properties
+    echo "log.config.2 = WARN.org.sakaiproject" >> sakai2-demo/sakai/sakai.properties
     echo "log.config.3 = DEBUG.org.sakaiproject.provider.user" >> sakai2-demo/sakai/sakai.properties
+    echo "log.config.4 = DEBUG.org.sakaiproject.login" >> sakai2-demo/sakai/sakai.properties
+    echo "log.config.5 = DEBUG.org.sakaiproject.hybrid" >> sakai2-demo/sakai/sakai.properties
+    echo "log.config.6 = DEBUG.org.sakaiproject.blti" >> sakai2-demo/sakai/sakai.properties
     date > $BUILD_DIR/sakai/.lastbuild
 fi
 
@@ -195,4 +201,6 @@ cd $BUILD_DIR/sakai2-demo
 echo "Running integration tests..."
 cd $BUILD_DIR/sakai3/nakamura
 date > $BUILD_DIR/logs/sakai3-integration-tests.log.txt
+uname -a >> $BUILD_DIR/logs/sakai3-integration-tests.log.txt 2>&1
+java -version >> $BUILD_DIR/logs/sakai3-integration-tests.log.txt 2>&1
 ./tools/runalltests.rb >> $BUILD_DIR/logs/sakai3-integration-tests.log.txt 2>&1

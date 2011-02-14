@@ -5,11 +5,11 @@
   <parent>
     <artifactId>base</artifactId>
     <groupId>org.sakaiproject.nakamura</groupId>
-    <version>0.9-SNAPSHOT</version>
+    <version>0.10-SNAPSHOT</version>
   </parent>
   <groupId>org.sakaiproject.nakamura</groupId>
   <artifactId>org.sakaiproject.nakamura.profile</artifactId>
-  <version>0.9-SNAPSHOT</version>
+  <version>0.10-SNAPSHOT</version>
   <packaging>bundle</packaging>
   <name>Sakai Nakamura :: Profile Bundle</name>
   <build>
@@ -35,6 +35,12 @@
     </plugins>
   </build>
   <dependencies>
+  
+    <dependency>
+      <groupId>com.google.collections</groupId>
+      <artifactId>google-collections</artifactId>
+    </dependency>
+    
     <!--  JCR, Jackrabbit and Sling -->
     <dependency>
       <groupId>javax.jcr</groupId>
@@ -67,12 +73,12 @@
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.doc</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
       <artifactId>org.sakaiproject.nakamura.utils</artifactId>
-      <version>0.9-SNAPSHOT</version>
+      <version>0.10-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
 

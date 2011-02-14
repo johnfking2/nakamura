@@ -36,10 +36,9 @@ import org.osgi.service.component.ComponentContext;
 import org.osgi.service.event.Event;
 import org.osgi.service.event.EventAdmin;
 import org.sakaiproject.nakamura.api.activemq.ConnectionFactoryService;
-import org.sakaiproject.nakamura.api.message.AbstractMessageRoute;
 import org.sakaiproject.nakamura.api.message.MessageConstants;
-import org.sakaiproject.nakamura.api.personal.PersonalUtils;
-import org.sakaiproject.nakamura.util.JcrUtils;
+import org.sakaiproject.nakamura.util.PersonalUtils;
+import org.sakaiproject.nakamura.api.templates.TemplateService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,6 +92,8 @@ public class OutgoingEmailMessageListener implements MessageListener {
   protected EventAdmin eventAdmin;
   @Reference
   protected ConnectionFactoryService connFactoryService;
+  @Reference
+  protected TemplateService templateService;
 
   protected static final String NODE_PATH_PROPERTY = "nodePath";
 
@@ -273,9 +274,27 @@ public class OutgoingEmailMessageListener implements MessageListener {
     }
 
     if (messageNode.hasProperty(MessageConstants.PROP_SAKAI_BODY)) {
+      String messageBody = messageNode.getProperty(MessageConstants.PROP_SAKAI_BODY).getString();
+      // if this message has a template, use it
+      LOGGER.debug("Checking for sakai:templatePath and sakai:templateParams properties on the outgoing message's node.");
+      if (messageNode.hasProperty(MessageConstants.PROP_TEMPLATE_PATH)
+          && messageNode.hasProperty(MessageConstants.PROP_TEMPLATE_PARAMS)) {
+        Map<String, String> parameters = getTemplateProperties(messageNode.getProperty(MessageConstants.PROP_TEMPLATE_PARAMS).getString());
+        String templatePath = messageNode.getProperty(MessageConstants.PROP_TEMPLATE_PATH).getString();
+        LOGGER.debug("Got the path '{0}' to the template for this outgoing message.", templatePath);
+        Node templateNode = session.getNode(templatePath);
+        if (templateNode.hasProperty("sakai:template")) {
+          String template = templateNode.getProperty("sakai:template").getString();
+          LOGGER.debug("Pulled the template body from the template node: {0}", template);
+          messageBody = templateService.evaluateTemplate(parameters, template);
+          LOGGER.debug("Performed parameter substitution in the template: {0}", messageBody);
+        }
+      } else {
+        LOGGER.debug("Message node '{0}' does not have sakai:templatePath and sakai:templateParams properties",
+            messageNode.getPath());
+      }
       try {
-        email.setMsg(messageNode.getProperty(MessageConstants.PROP_SAKAI_BODY)
-            .getString());
+        email.setMsg(messageBody);
       } catch (EmailException e) {
         throw new EmailDeliveryException("Invalid Message Body, message is being dropped :" + e.getMessage(), e);
       }
@@ -305,6 +324,16 @@ public class OutgoingEmailMessageListener implements MessageListener {
     }
 
     return email;
+  }
+
+  private Map<String, String> getTemplateProperties(String templateParameter) throws ValueFormatException, IllegalStateException, RepositoryException {
+    Map<String,String> rv = new HashMap<String, String>();
+    String[] values = templateParameter.split("\\|");
+    for (String value : values) {
+      String[] keyValuePair = value.split("=");
+      rv.put(keyValuePair[0], keyValuePair[1]);
+    }
+    return rv;
   }
 
   private String convertToEmail(String address, javax.jcr.Session session) {

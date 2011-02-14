@@ -42,14 +42,12 @@ import org.sakaiproject.nakamura.api.doc.ServiceSelector;
 import org.sakaiproject.nakamura.api.presence.PresenceService;
 import org.sakaiproject.nakamura.api.presence.PresenceUtils;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
-import org.sakaiproject.nakamura.api.user.UserConstants;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.Enumeration;
 import java.util.List;
 
 import javax.jcr.RepositoryException;
@@ -139,7 +137,7 @@ public class PresenceContactsServlet extends SlingSafeMethodsServlet {
     if ( session != null ) {
       user = session.getUserID();
     }
-    if (user == null || UserConstants.ANON_USERID.equals(user) ) {
+    if (user == null || PresenceUtils.ANON_USERID.equals(user) ) {
       response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
           "User must be logged in to check their status");
     }
@@ -156,7 +154,7 @@ public class PresenceContactsServlet extends SlingSafeMethodsServlet {
       output.object();
       PresenceUtils.makePresenceJSON(output, user, presenceService, true);
       // add in the list of contacts info
-      List<String> userIds = connectionManager.getConnectedUsers(user,
+      List<String> userIds = connectionManager.getConnectedUsers(request, user,
           ConnectionState.ACCEPTED);
       output.key("contacts");
       UserManager um = AccessControlUtil.getUserManager(session);

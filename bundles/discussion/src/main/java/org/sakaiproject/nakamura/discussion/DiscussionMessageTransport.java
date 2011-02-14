@@ -32,9 +32,7 @@ import static org.sakaiproject.nakamura.api.message.MessageConstants.PROP_SAKAI_
 import static org.sakaiproject.nakamura.api.message.MessageConstants.PROP_SAKAI_TYPE;
 import static org.sakaiproject.nakamura.api.message.MessageConstants.STATE_NOTIFIED;
 
-import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Reference;
-import org.apache.felix.scr.annotations.Service;
 import org.apache.jackrabbit.api.security.user.Authorizable;
 import org.apache.sling.jcr.api.SlingRepository;
 import org.apache.sling.jcr.base.util.AccessControlUtil;
@@ -67,8 +65,8 @@ import javax.jcr.Session;
  * Handler for messages that are sent locally and intended for local delivery. Needs to be
  * started immediately to make sure it registers with JCR as soon as possible.
  */
-@Component(immediate = true, label = "%discussion.messageTransport.label", description = "%discussion.messageTransport.desc")
-@Service
+//@Component(immediate = true, label = "%discussion.messageTransport.label", description = "%discussion.messageTransport.desc")
+//@Service
 public class DiscussionMessageTransport implements MessageTransport {
   private static final Logger LOG = LoggerFactory
       .getLogger(DiscussionMessageTransport.class);
