@@ -434,8 +434,26 @@ public class DefaultPostProcessor implements LiteAuthorizablePostProcessor {
         // Profile
         String profileType = (authorizable instanceof Group) ? SAKAI_GROUP_PROFILE_RT
                                                             : SAKAI_USER_PROFILE_RT;
-        createPath(authId, LitePersonalUtils.getPublicPath(authId) + PROFILE_FOLDER,
-            profileType, false, contentManager, accessControlManager, null);
+        // FIXME BL120 this is a hackaround to KERN-1569; UI needs to change behavior
+        final Map<String, Object> sakaiAuthzProperties = new HashMap<String, Object>();
+        sakaiAuthzProperties.put("homePath", homePath);
+        if (authorizable instanceof Group) {
+          for (final Entry<String, Object> entry : authorizable.getSafeProperties()
+              .entrySet()) {
+            if (entry.getKey().startsWith("sakai:group")) {
+              sakaiAuthzProperties.put(entry.getKey(), entry.getValue());
+            }
+          }
+          createPath(authId, LitePersonalUtils.getPublicPath(authId) + PROFILE_FOLDER,
+              profileType, false, contentManager, accessControlManager,
+              sakaiAuthzProperties);
+        } else {
+          createPath(authId, LitePersonalUtils.getPublicPath(authId) + PROFILE_FOLDER,
+              profileType, false, contentManager, accessControlManager, sakaiAuthzProperties);
+        }
+        // end KERN-1569 hackaround
+        // createPath(authId, LitePersonalUtils.getPublicPath(authId) + PROFILE_FOLDER,
+        // profileType, false, contentManager, accessControlManager, null);
 
         Map<String, Object> profileProperties = processProfileParameters(
             defaultProfileTemplate, authorizable, parameters);
@@ -600,11 +618,11 @@ public class DefaultPostProcessor implements LiteAuthorizablePostProcessor {
       if (content == null) {
         content = contentManager.get(thisPath);
         if (contentNode.hasProperty(JcrConstants.JCR_MIMETYPE)) {
-          content.setProperty(Content.MIMETYPE,
+          content.setProperty(Content.MIMETYPE_FIELD,
               contentNode.getProperty(JcrConstants.JCR_MIMETYPE).getString());
         }
         if (contentNode.hasProperty(JcrConstants.JCR_LASTMODIFIED)) {
-          content.setProperty(Content.LASTMODIFIED,
+          content.setProperty(Content.LASTMODIFIED_FIELD,
               contentNode.getProperty(JcrConstants.JCR_LASTMODIFIED).getLong());
         }
       }
