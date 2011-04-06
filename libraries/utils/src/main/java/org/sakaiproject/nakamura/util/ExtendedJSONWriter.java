@@ -19,6 +19,7 @@ package org.sakaiproject.nakamura.util;
 
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.commons.json.JSONException;
+import org.apache.sling.commons.json.JSONObject;
 import org.apache.sling.commons.json.io.JSONWriter;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.content.Content;
@@ -195,6 +196,59 @@ public class ExtendedJSONWriter extends JSONWriter {
       }
     }
   }
+
+    /**
+     * Exactly like writeNodeContentsToWriter except that it will turn Strings into JSON objects if
+     * they represent valid JSON, at some performance cost.
+     */
+    public static void writeNodeContentsToWriterWithJSONUnpacking(JSONWriter write, Content content)
+            throws JSONException {
+        // Since removal of bigstore we add in jcr:path and jcr:name
+        write.key("jcr:path");
+        write.value(PathUtils.translateAuthorizablePath(content.getPath()));
+        write.key("jcr:name");
+        write.value(StorageClientUtils.getObjectName(content.getPath()));
+
+        Map<String, Object> props = content.getProperties();
+        for (Entry<String, Object> prop : props.entrySet()) {
+            String propName = prop.getKey();
+            Object propValue = prop.getValue();
+
+            if ("_path".equals(propName)) {
+                continue;
+            }
+
+            write.key(propName);
+            if (propValue instanceof Object[]) {
+                write.array();
+                for (Object value : (Object[]) propValue) {
+                    if (isUserPath(propName, value)) {
+                        write.value(PathUtils.translateAuthorizablePath(value));
+                    } else {
+                        write.value(value);
+                    }
+                }
+                write.endArray();
+            } else if (propValue instanceof java.util.Calendar) {
+                write.value(DateUtils.iso8601((java.util.Calendar) propValue));
+            } else {
+                if (isUserPath(propName, propValue)) {
+                    write.value(PathUtils.translateAuthorizablePath(propValue));
+                } else {
+                    if (propValue instanceof String) {
+                        try {
+                            JSONObject jsonObject = new JSONObject((String) propValue);
+                            write.value(jsonObject);
+                            continue;
+                        } catch (JSONException ignored) {
+                            // it's not JSON, so skip
+                        }
+                    }
+                    write.value(propValue);
+                }
+            }
+        }
+    }
 
   @Override
   public JSONWriter value(Object object) throws JSONException {
