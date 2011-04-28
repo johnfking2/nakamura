@@ -631,11 +631,6 @@
       <url>dav:http://svn.media.berkeley.edu/nexus/content/repositories/myberkeley/</url>
       <uniqueVersion>false</uniqueVersion>
     </repository>
-    <site>
-      <id>sakai-site</id>
-      <name>Sakai release Site</name>
-      <url>scp://source.sakaiproject.org/var/www/html/release/nakamura/${project.version}</url>
-    </site>
   </distributionManagement>
 <!-- ====================================================================== -->
 <!-- R E P O S I T O R I E S -->
@@ -679,6 +674,29 @@
       <name>Sakai Snapshots</name>
       <layout>default</layout>
       <url>http://source.sakaiproject.org/maven2-snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>myberkeley-releases</id>
+      <name>MyBerkeley Releases</name>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <url>http://svn.media.berkeley.edu/nexus/content/repositories/myberkeley/</url>
+    </repository>
+    <repository>
+      <id>myberkeley-snapshots</id>
+      <name>MyBerkeley Snapshots</name>
+      <layout>default</layout>
+      <url>http://svn.media.berkeley.edu/nexus/content/repositories/myberkeley-snapshots/</url>
       <releases>
         <enabled>false</enabled>
       </releases>
