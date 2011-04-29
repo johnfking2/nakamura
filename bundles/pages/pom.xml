@@ -89,7 +89,7 @@
     </dependency>
     <dependency>
       <groupId>org.sakaiproject.nakamura</groupId>
-      <artifactId>org.sakaiproject.nakamura.solr-myberkeley</artifactId>
+      <artifactId>org.sakaiproject.nakamura.solr</artifactId>
       <version>0.10-20110426</version>
       <scope>provided</scope>
     </dependency>
