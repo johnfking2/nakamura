@@ -27,19 +27,6 @@ server=ARGV[0]
 # to run: ./preview_processor.rb http://localhost:8080/
 DEBUG = false
 
-# override the initialize_http_header method that sling.rb overrides
-# in order to properly set the referrer
-module Net::HTTPHeader
-  def initialize_http_header(initheader)
-      @header = { "Referer" => [ARGV[0]] }
-      return unless initheader
-      initheader.each do |key, value|
-        warn "net/http: warning: duplicated HTTP header: #{key}" if key?(key) and $VERBOSE
-        @header[key.downcase] = [value.strip]
-      end
-  end
-end
-
 
 def resize_and_write_file filename, filename_output, max_width, max_height
   pic = Magick::Image.read(filename).first
@@ -55,6 +42,19 @@ def resize_and_write_file filename, filename_output, max_width, max_height
   nbytes, content = File.size(filename_output), nil
   File.open(filename_output, "rb") { |f| content = f.read nbytes }
   content
+end
+
+def process_as_image? extension
+  ['.png', '.jpg', '.gif', '.psd'].include? extension
+end
+
+def determine_file_extension_with_mime_type mimetype
+  fe = `grep #{mimetype} ../mime.types`.gsub(mimetype, '').strip.strip.split(' ')[0]
+  if fe == '' || fe.nil?
+    ''
+  else
+    ".#{fe}"
+  end
 end
 
 res = @s.execute_get(@s.url_for("var/search/needsprocessing.json"))
@@ -85,15 +85,17 @@ Dir["*"].each do |id|
     meta_file = @s.execute_get @s.url_for("p/#{id}.json")
     next unless meta_file.code == '200' # skip.
     meta = JSON.parse meta_file.body
-    extension = File.extname meta['sakai:pooled-content-file-name']
-    raise "File extension is nil" if extension.nil?
 
     # making a local copy of the file.
+    mimeType = meta['_mimeType']
+    extension = determine_file_extension_with_mime_type mimeType
     filename = id + extension
+    puts "with filename: #{filename}"
+
     content_file = @s.execute_get @s.url_for("p/#{id}")
     File.open(filename, 'wb') { |f| f.write content_file.body }
 
-    if ['.png', '.jpg', '.jpeg', '.gif', '.psd'].include? extension
+    if process_as_image? extension
       # Images don't need a preview so we make a big and small thumbnail instead.
 
       page_count = 1
@@ -112,7 +114,7 @@ Dir["*"].each do |id|
       puts "Uploaded thumb to curl #{@s.url_for("p/#{id}.page1-small.jpg")}"
 
       ## Cleaning crew.
-      FileUtils.rm DOCS_DIR + "/#{filename_thumb}"
+      FileUtils.rm DOCS_DIR + "/#{filename_thumb}" unless DEBUG
     else
       # Generating image previews of te document.
       Docsplit.extract_images filename, :size => '700x', :format => :jpg
@@ -150,12 +152,12 @@ Dir["*"].each do |id|
       end
 
       # Cleaning crew.
-      FileUtils.remove_dir PREVS_DIR + "/#{id}"
+      FileUtils.remove_dir PREVS_DIR + "/#{id}" unless DEBUG
 
     end
 
     # cleaning crew.
-    FileUtils.rm DOCS_DIR + "/#{filename}"
+    FileUtils.rm DOCS_DIR + "/#{filename}" unless DEBUG
 
     # passing on the page_count.
     @s.execute_post @s.url_for("p/#{id}"), {"sakai:pagecount" => page_count}
@@ -169,5 +171,5 @@ Dir["*"].each do |id|
   end
 end
 
-FileUtils.remove_dir PREVS_DIR
-FileUtils.remove_dir DOCS_DIR
+FileUtils.remove_dir PREVS_DIR unless DEBUG
+FileUtils.remove_dir DOCS_DIR unless DEBUG
