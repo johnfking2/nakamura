@@ -17,18 +17,23 @@
  */
 package org.sakaiproject.nakamura.profile;
 
+import static org.sakaiproject.nakamura.api.profile.CountProvider.CONTACTS_PROP;
+import static org.sakaiproject.nakamura.api.profile.CountProvider.CONTENT_ITEMS_PROP;
+import static org.sakaiproject.nakamura.api.profile.CountProvider.COUNTS_PROP;
+import static org.sakaiproject.nakamura.api.profile.CountProvider.GROUP_MEMBERSHIPS_PROP;
+import static org.sakaiproject.nakamura.api.profile.CountProvider.GROUP_MEMBERS_PROP;
 import static org.sakaiproject.nakamura.api.user.UserConstants.GROUP_DESCRIPTION_PROPERTY;
 import static org.sakaiproject.nakamura.api.user.UserConstants.GROUP_TITLE_PROPERTY;
+import static org.sakaiproject.nakamura.api.user.UserConstants.PREFERRED_NAME;
 import static org.sakaiproject.nakamura.api.user.UserConstants.USER_BASIC;
+import static org.sakaiproject.nakamura.api.user.UserConstants.USER_COLLEGE;
+import static org.sakaiproject.nakamura.api.user.UserConstants.USER_DATEOFBIRTH;
+import static org.sakaiproject.nakamura.api.user.UserConstants.USER_DEPARTMENT;
 import static org.sakaiproject.nakamura.api.user.UserConstants.USER_EMAIL_PROPERTY;
 import static org.sakaiproject.nakamura.api.user.UserConstants.USER_FIRSTNAME_PROPERTY;
 import static org.sakaiproject.nakamura.api.user.UserConstants.USER_LASTNAME_PROPERTY;
 import static org.sakaiproject.nakamura.api.user.UserConstants.USER_PICTURE;
-import static org.sakaiproject.nakamura.api.user.UserConstants.PREFERRED_NAME;
 import static org.sakaiproject.nakamura.api.user.UserConstants.USER_ROLE;
-import static org.sakaiproject.nakamura.api.user.UserConstants.USER_COLLEGE;
-import static org.sakaiproject.nakamura.api.user.UserConstants.USER_DEPARTMENT;
-import static org.sakaiproject.nakamura.api.user.UserConstants.USER_DATEOFBIRTH;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -56,6 +61,7 @@ import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.lite.content.ContentManager;
+import org.sakaiproject.nakamura.api.profile.CountProvider;
 import org.sakaiproject.nakamura.api.profile.ProfileConstants;
 import org.sakaiproject.nakamura.api.profile.ProfileProvider;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
@@ -95,13 +101,17 @@ public class ProfileServiceImpl implements ProfileService {
   private final static String[] DEFAULT_BASIC_PROFILE_ELEMENTS = new String[] {USER_FIRSTNAME_PROPERTY, USER_LASTNAME_PROPERTY,
     USER_EMAIL_PROPERTY, USER_PICTURE, PREFERRED_NAME, USER_ROLE, USER_DEPARTMENT, USER_COLLEGE, USER_DATEOFBIRTH};
 
+  private final static String[] USER_COUNTS_PROPS = new String[] {CONTACTS_PROP, GROUP_MEMBERSHIPS_PROP, CONTENT_ITEMS_PROP, GROUP_MEMBERS_PROP};
 
   @Property(value={USER_FIRSTNAME_PROPERTY, USER_LASTNAME_PROPERTY,
       USER_EMAIL_PROPERTY, USER_PICTURE, PREFERRED_NAME, USER_ROLE, USER_DEPARTMENT, USER_COLLEGE, USER_DATEOFBIRTH})
   public final static String BASIC_PROFILE_ELEMENTS = "basicProfileElements";
 
   private String[] basicProfileElements;
-
+  
+  @Reference
+  private CountProvider countProvider;
+  
   @Activate
   protected void activate(Map<String, Object> properties ) {
     basicProfileElements = OsgiUtil.toStringArray(properties.get(BASIC_PROFILE_ELEMENTS), DEFAULT_BASIC_PROFILE_ELEMENTS);
@@ -130,6 +140,7 @@ public class ProfileServiceImpl implements ProfileService {
       profileMap.putAll(getProfileMap(profileContent, session));
     }
     profileMap.put(USER_BASIC, basicProfileMapForAuthorizable(authorizable));
+    profileMap.put(COUNTS_PROP, countsMapforAuthorizable(authorizable, sparseSession));
     if (authorizable.isGroup()) {
       addGroupProperties(authorizable, profileMap);
     } else {
@@ -165,10 +176,19 @@ public class ProfileServiceImpl implements ProfileService {
       } else if (ProfileConstants.GROUP_PROFILE_RT.equals(resourceType)) {
         map.put("groupid", PathUtils.getAuthorizableId(profileContent.getPath()));
       }
+      org.sakaiproject.nakamura.api.lite.Session sparseSession = StorageClientUtils.adaptToSession(jcrSession);
+      AuthorizableManager auManager = sparseSession.getAuthorizableManager();
+      String authorizableId = PathUtils.getAuthorizableId(profileContent.getPath());
+      Authorizable au = auManager.findAuthorizable(authorizableId);
+      map.put(COUNTS_PROP, countsMapforAuthorizable(au, sparseSession));
       return map;
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     } catch (ExecutionException e) {
+      throw new RuntimeException(e);
+    } catch (StorageClientException e) {
+      throw new RuntimeException(e);
+    } catch (AccessDeniedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -277,6 +297,24 @@ public class ProfileServiceImpl implements ProfileService {
     return compactProfile;
   }
 
+  private ValueMap countsMapforAuthorizable(Authorizable authorizable, org.sakaiproject.nakamura.api.lite.Session session) throws AccessDeniedException, StorageClientException {
+    if (countProvider != null) {
+      if (countProvider.needsRefresh(authorizable)) {
+        countProvider.update(authorizable);
+      }
+    } else {
+      throw new IllegalStateException("@Reference CountProvider is null!");
+    }
+    Builder<String, Object> propertyBuilder = ImmutableMap.builder();
+    for (String countPropName : USER_COUNTS_PROPS) {
+      if (authorizable.hasProperty(countPropName)) {
+        propertyBuilder.put(countPropName, authorizable.getProperty(countPropName));
+      }
+    }
+    ValueMap allCounts = new ValueMapDecorator(propertyBuilder.build());
+    if (LOG.isDebugEnabled())LOG.debug("counts map: {} for authorizableId: {}", new Object[]{allCounts, authorizable.getId()});
+    return allCounts;
+  }
 
   /**
    * Loops over an entire profile and checks if some of the nodes are marked as external.
@@ -383,6 +421,7 @@ public class ProfileServiceImpl implements ProfileService {
     basic.put("elements", elements);
     return basic;
   }
+  
   
   private ValueMap anonymousProfile() {
     ValueMap rv = new ValueMapDecorator(new HashMap<String, Object>());
