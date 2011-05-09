@@ -104,6 +104,14 @@
        </modules>
     </profile>
     <profile>
+       <id>myberkeley</id>
+       <modules>
+        <module>contrib/casauth</module>
+        <module>contrib/mysql-jdbc</module>
+        <module>contrib/rootconfig</module>
+       </modules>
+    </profile>
+    <profile>
        <id>ucam</id>
        <modules>
         <module>contrib/ucam</module>
@@ -919,7 +927,7 @@
         <artifactId>solr-solrj</artifactId>
         <version>4.0.1040465</version>
       </dependency>
-							      
+
     </dependencies>
   </dependencyManagement>
 </project>
