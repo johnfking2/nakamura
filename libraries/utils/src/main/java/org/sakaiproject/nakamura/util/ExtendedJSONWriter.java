@@ -317,7 +317,7 @@ public class ExtendedJSONWriter extends JSONWriter {
   }
   public static void writeContentTreeToWriter(JSONWriter write, Content content, int maxDepth)
       throws JSONException {
-    writeNodeTreeToWriter(write, content, false, maxDepth, 0);
+    writeContentTreeToWriter(write, content, false, maxDepth, 0, true);
   }
 
   /**
@@ -350,7 +350,12 @@ public class ExtendedJSONWriter extends JSONWriter {
 
   public static void writeContentTreeToWriter(JSONWriter write, Content content,
       boolean objectInProgress, int maxDepth) throws JSONException {
-    writeNodeTreeToWriter(write, content, objectInProgress, maxDepth, 0);
+    writeContentTreeToWriter(write, content, objectInProgress, maxDepth, 0, true);
+  }
+
+  public static void writeContentTreeToWriter(JSONWriter write, Content content,
+      boolean objectInProgress, int maxDepth, boolean usePathAsKey) throws JSONException {
+    writeContentTreeToWriter(write, content, objectInProgress, maxDepth, 0, usePathAsKey);
   }
 
   /**
@@ -396,8 +401,9 @@ public class ExtendedJSONWriter extends JSONWriter {
     }
   }
 
-  protected static void writeNodeTreeToWriter(JSONWriter write, Content content,
-      boolean objectInProgress, int maxDepth, int currentLevel)
+  protected static void writeContentTreeToWriter(JSONWriter write, Content content,
+                                                 boolean objectInProgress, int maxDepth, int currentLevel,
+                                                 boolean usePathAsKey)
       throws JSONException {
     // Write this node's properties.
     if (!objectInProgress) {
@@ -408,8 +414,12 @@ public class ExtendedJSONWriter extends JSONWriter {
     if (maxDepth == -1 || currentLevel < maxDepth) {
       // Write all the child nodes.
       for (Content child : content.listChildren()) {
-        write.key(child.getPath());
-        writeNodeTreeToWriter(write, child, false, maxDepth, currentLevel + 1);
+        if ( usePathAsKey ) {
+          write.key(child.getPath());
+        } else {
+          write.key(StorageClientUtils.getObjectName(child.getPath()));
+        }
+        writeContentTreeToWriter(write, child, false, maxDepth, currentLevel + 1, usePathAsKey);
       }
     }
 
