@@ -157,6 +157,10 @@ public class ExtendedJSONWriter extends JSONWriter {
 
   public static void writeNodeContentsToWriter(JSONWriter write, Content content)
       throws JSONException {
+    if (content == null) {
+      return;
+    }
+
     // Since removal of bigstore we add in jcr:path and jcr:name
     write.key("jcr:path");
     write.value(PathUtils.translateAuthorizablePath(content.getPath()));
@@ -405,6 +409,10 @@ public class ExtendedJSONWriter extends JSONWriter {
                                                  boolean objectInProgress, int maxDepth, int currentLevel,
                                                  boolean usePathAsKey)
       throws JSONException {
+    if (content == null) {
+      return;
+    }
+
     // Write this node's properties.
     if (!objectInProgress) {
       write.object();
