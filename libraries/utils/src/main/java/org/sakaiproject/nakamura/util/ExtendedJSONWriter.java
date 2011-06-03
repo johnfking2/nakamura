@@ -22,6 +22,8 @@ import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.io.JSONWriter;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.content.Content;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Writer;
 import java.util.Collection;
@@ -38,6 +40,7 @@ import javax.jcr.ValueFormatException;
 import javax.jcr.nodetype.PropertyDefinition;
 
 public class ExtendedJSONWriter extends JSONWriter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ExtendedJSONWriter.class);
 
   public ExtendedJSONWriter(Writer w) {
     super(w);
@@ -392,6 +395,7 @@ public class ExtendedJSONWriter extends JSONWriter {
                                                  boolean usePathAsKey)
       throws JSONException {
     if (content == null) {
+      LOGGER.warn("Can't write node tree to writer; null content");
       return;
     }
 
