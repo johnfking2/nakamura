@@ -20,7 +20,6 @@ package org.sakaiproject.nakamura.util;
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.io.JSONWriter;
-import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -307,7 +306,7 @@ public class ExtendedJSONWriter extends JSONWriter {
   }
   public static void writeContentTreeToWriter(JSONWriter write, Content content, int maxDepth)
       throws JSONException {
-    writeNodeTreeToWriter(write, content, false, maxDepth, 0);
+    writeNodeTreeToWriter(write, content, false, maxDepth, 0, true);
   }
 
   /**
@@ -340,7 +339,12 @@ public class ExtendedJSONWriter extends JSONWriter {
 
   public static void writeContentTreeToWriter(JSONWriter write, Content content,
       boolean objectInProgress, int maxDepth) throws JSONException {
-    writeNodeTreeToWriter(write, content, objectInProgress, maxDepth, 0);
+    writeNodeTreeToWriter(write, content, objectInProgress, maxDepth, 0, true);
+  }
+
+  public static void writeContentTreeToWriter(JSONWriter write, Content content,
+                                              boolean objectInProgress, int maxDepth, boolean usePathAsKey) throws JSONException {
+    writeNodeTreeToWriter(write, content, objectInProgress, maxDepth, 0, usePathAsKey);
   }
 
   /**
@@ -387,7 +391,7 @@ public class ExtendedJSONWriter extends JSONWriter {
   }
 
   protected static void writeNodeTreeToWriter(JSONWriter write, Content content,
-      boolean objectInProgress, int maxDepth, int currentLevel)
+                                              boolean objectInProgress, int maxDepth, int currentLevel, boolean usePathAsKey)
       throws JSONException {
     if (content == null) {
       LOGGER.warn("Can't write node tree to writer; null content");
@@ -403,8 +407,12 @@ public class ExtendedJSONWriter extends JSONWriter {
     if (maxDepth == -1 || currentLevel < maxDepth) {
       // Write all the child nodes.
       for (Content child : content.listChildren()) {
-        write.key(child.getPath());
-        writeNodeTreeToWriter(write, child, false, maxDepth, currentLevel + 1);
+        if ( usePathAsKey ) {
+          write.key(child.getPath());
+        } else {
+          write.key(PathUtils.lastElement(child.getPath()));
+        }
+        writeNodeTreeToWriter(write, child, false, maxDepth, currentLevel + 1, true);
       }
     }
 
