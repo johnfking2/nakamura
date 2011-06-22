@@ -139,6 +139,7 @@ def main
 
       # Making a local copy of the file.
       content_file = @s.execute_get @s.url_for("p/#{id}")
+      log "Got original file with status #{content_file.code}"
       File.open(filename, 'wb') { |f| f.write content_file.body }
 
       if process_as_image? extension
@@ -146,14 +147,17 @@ def main
         filename_thumb = 'thumb.jpg'
 
         content = resize_and_write_file filename, filename_thumb, 900
+        log "About to post image preview"
         post_file_to_server id, content, :normal, page_count
 
         content = resize_and_write_file filename, filename_thumb, 180, 225
+        log "About to post thumbnail preview"
         post_file_to_server id, content, :small, page_count
 
         FileUtils.rm DOCS_DIR + "/#{filename_thumb}"
       else
         # Generating image previews of te document.
+        log "About to call Docsplit"
         Docsplit.extract_images filename, :size => '1000x', :format => :jpg
 
         # Skip documents with a page count of 0, just to be sure.
@@ -174,6 +178,7 @@ def main
           # Upload the generated preview of this page.
           nbytes, content = File.size(filename_p), nil
           File.open(filename_p, "rb") { |f| content = f.read nbytes }
+          log "About to post page of document preview"
           post_file_to_server id, content, :large, index + 1
 
           # Generate 2 thumbnails and upload them to the server.
