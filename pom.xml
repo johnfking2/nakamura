@@ -108,7 +108,6 @@
        <modules>
         <module>contrib/casauth</module>
         <module>contrib/mysql-jdbc</module>
-        <module>contrib/rootconfig</module>
        </modules>
     </profile>
     <profile>
