@@ -1,0 +1,61 @@
+package org.sakaiproject.nakamura.user.counts;
+
+import org.apache.felix.scr.annotations.Component;
+import org.apache.felix.scr.annotations.Property;
+import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.Service;
+import org.apache.sling.commons.scheduler.Job;
+import org.apache.sling.commons.scheduler.Scheduler;
+import org.osgi.service.component.ComponentContext;
+import org.sakaiproject.nakamura.api.lite.Repository;
+import org.sakaiproject.nakamura.api.solr.SolrServerService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Serializable;
+import java.util.Dictionary;
+import java.util.HashMap;
+import java.util.Map;
+
+
+@Component(label = "Nakamura :: CountRefreshScheduler",
+    description = "Runs scheduled jobs that refresh the authorizables' counts in batches",
+    immediate = true, metatype = true)
+@Service(value = CountsRefreshScheduler.class)
+public class CountsRefreshScheduler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CountsRefreshScheduler.class);
+
+  @Reference
+  protected Repository sparseRepository;
+
+  @Reference
+  protected Scheduler scheduler;
+
+  @Reference
+  protected SolrServerService solrServerService;
+  
+  @Property(longValue = 30, label = "Refresh Interval Seconds",
+          description = "How often to wake up update a batch of authorizables")
+  protected static final String PROP_POLL_INTERVAL_SECONDS = "refreshcounts.pollinterval";
+
+  protected final static String JOB_NAME = "refreshCountsJob";
+  
+  protected void activate(ComponentContext componentContext) throws Exception {
+    Dictionary<?, ?> props = componentContext.getProperties();
+    Long pollInterval = (Long) props.get(PROP_POLL_INTERVAL_SECONDS);
+    Map<String, Serializable> config = new HashMap<String, Serializable>();
+    final Job countsRefreshJob = new CountsRefreshJob(this.sparseRepository, this.solrServerService);
+    try {
+      LOGGER.debug("Activating CountsRefreshJob...");
+      this.scheduler.addPeriodicJob(JOB_NAME, countsRefreshJob, config, pollInterval, false);
+    } catch (Exception e) {
+      LOGGER.error("Failed to add periodic job for CountsRefreshScheduler", e);
+    }
+  }
+
+  @SuppressWarnings({"UnusedParameters"})
+  protected void deactivate(ComponentContext componentContext) throws Exception {
+    LOGGER.debug("Removing SendNotificationsJob...");
+    this.scheduler.removeJob(JOB_NAME);
+  }
+}
