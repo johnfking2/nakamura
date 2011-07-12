@@ -34,6 +34,9 @@ public class CountsRefreshScheduler {
   @Reference
   protected SolrServerService solrServerService;
   
+  @Reference
+  protected CountProvider countProvider;
+  
   @Property(longValue = 30, label = "Refresh Interval Seconds",
           description = "How often to wake up update a batch of authorizables")
   protected static final String PROP_POLL_INTERVAL_SECONDS = "refreshcounts.pollinterval";
@@ -44,7 +47,7 @@ public class CountsRefreshScheduler {
     Dictionary<?, ?> props = componentContext.getProperties();
     Long pollInterval = (Long) props.get(PROP_POLL_INTERVAL_SECONDS);
     Map<String, Serializable> config = new HashMap<String, Serializable>();
-    final Job countsRefreshJob = new CountsRefreshJob(this.sparseRepository, this.solrServerService);
+    final Job countsRefreshJob = new CountsRefreshJob(this.sparseRepository, this.solrServerService, this.countProvider);
     try {
       LOGGER.debug("Activating CountsRefreshJob...");
       this.scheduler.addPeriodicJob(JOB_NAME, countsRefreshJob, config, pollInterval, false);
