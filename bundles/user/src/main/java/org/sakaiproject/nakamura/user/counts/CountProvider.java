@@ -2,6 +2,7 @@ package org.sakaiproject.nakamura.user.counts;
 
 import com.google.common.collect.ImmutableSet;
 
+import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
@@ -32,6 +33,15 @@ public interface CountProvider {
   public void update(Authorizable au) throws AccessDeniedException, StorageClientException;
   
   /**
+   * get total counts for group memberships, contacts and content items
+   * @param au the authorizable, may be modified by the update operation.
+   * @param session
+   * @throws AccessDeniedException
+   * @throws StorageClientException
+   */
+  public void update(Authorizable authorizable, Session session) throws AccessDeniedException, StorageClientException;
+  
+  /**
    * are the counts null or too old
    * @param authorizable
    * @return
@@ -40,5 +50,9 @@ public interface CountProvider {
    */
   public boolean needsRefresh(Authorizable authorizable) throws AccessDeniedException, StorageClientException;
   
-
+ /**
+  * 
+  * @return
+  */
+  public Long getUpdateIntervalMinutes();
 }

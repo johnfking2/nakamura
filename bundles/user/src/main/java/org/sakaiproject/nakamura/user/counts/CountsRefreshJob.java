@@ -32,32 +32,52 @@ public class CountsRefreshJob implements Job {
     this.solrServerService = solrServerService;
     this.countProvider = countProvider;
   }
-
+  
+/**
+ * update the batch size number of Authorizables whose countLastUpdate is null (never updated)
+ * or whose countLastUpdate is more than the update interval minutes ago
+ * {@inheritDoc}
+ * @see org.apache.sling.commons.scheduler.Job#execute(org.apache.sling.commons.scheduler.JobContext)
+ */
   public void execute(JobContext context) {
-    Session session = null;
+    Session adminSession = null;
+    Integer batchSize = (Integer) context.getConfiguration().get(CountsRefreshScheduler.PROP_UPDATE_BATCH_SIZE);
     try {
-      session = this.sparseRepository.loginAdministrative();
-      AuthorizableManager authManager = session.getAuthorizableManager();
+      adminSession = this.sparseRepository.loginAdministrative();
+      AuthorizableManager authManager = adminSession.getAuthorizableManager();
       SolrServer solrServer = solrServerService.getServer();
       Long nowTicks = System.currentTimeMillis();
-      Long updateTicks = nowTicks - 10 * 1000;
-      // String queryString =
-      // "(+resourceType:sparse/user OR +resourceType:sparse/group) AND -countLastUpdate:[* TO *]";
-      // //-countLastUpdate:[\\"\\" TO *]
-      String queryString = "resourceType:authorizable AND -countLastUpdate:[* TO *]"; // -countLastUpdate:[\\"\\"
-                                                                                      // TO
-                                                                                      // *]
-      SolrQuery solrQuery = new SolrQuery(queryString);
-      solrQuery.setTermsLimit(100);
+      Long updateIntervalTicks = this.countProvider.getUpdateIntervalMinutes() * 60 * 1000;
+      Long updateTicks = nowTicks - updateIntervalTicks;
+//      -(-myfield:[start TO finish] AND myfield:[* TO *])
+      // find all the authorizables whose countLastUpdate was more than update interval ago or who have never been updated
+      StringBuilder querySB = new StringBuilder("+resourceType:authorizable AND -(-countLastUpdate:[0 TO ")
+                                   .append(updateTicks).append("] AND countLastUpdate[* TO *])");
+      String queryString = querySB.toString(); 
+      SolrQuery solrQuery = new SolrQuery(queryString).setStart(0).setRows(batchSize);
       QueryResponse response;
       try {
         response = solrServer.query(solrQuery);
         SolrDocumentList results = response.getResults();
+        long numResults = results.getNumFound();
+        LOGGER.info("with query {}, found {} results", new Object[] { queryString, numResults });
+        batchSize = (int) (batchSize < numResults ? batchSize : numResults);
+        LOGGER.info("will update counts on max of {} authorizables", new Object[] { batchSize });
+        Long startTicks = System.currentTimeMillis();
+        int count = 0;
         for (SolrDocument solrDocument : results) {
           String authorizableId = (String) solrDocument.getFieldValue("id");
           Authorizable authorizable = authManager.findAuthorizable(authorizableId);
-          this.countProvider.update(authorizable);
+          if (authorizable != null) {
+            this.countProvider.update(authorizable, adminSession);
+            count++;
+          } else {
+            LOGGER.warn("couldn't find authorizable: " + authorizableId);
+          }
         }
+        Long endTicks = System.currentTimeMillis();
+        LOGGER.info("updated {} authorizables in {} seconds", new Object[] { count,
+            (endTicks - startTicks) / 1000 });
       } catch (SolrServerException e) {
         LOGGER.warn(e.getMessage(), e);
       }
@@ -68,9 +88,9 @@ public class CountsRefreshJob implements Job {
     } catch (AccessDeniedException e) {
       LOGGER.warn(e.getMessage(), e);
     } finally {
-      if (session != null)
+      if (adminSession != null)
         try {
-          session.logout();
+          adminSession.logout();
         } catch (ClientPoolException e) {
           LOGGER.warn(e.getMessage(), e);
         }
