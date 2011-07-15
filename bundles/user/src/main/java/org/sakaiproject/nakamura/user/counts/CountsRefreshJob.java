@@ -32,52 +32,60 @@ public class CountsRefreshJob implements Job {
     this.solrServerService = solrServerService;
     this.countProvider = countProvider;
   }
-  
-/**
- * update the batch size number of Authorizables whose countLastUpdate is null (never updated)
- * or whose countLastUpdate is more than the update interval minutes ago
- * {@inheritDoc}
- * @see org.apache.sling.commons.scheduler.Job#execute(org.apache.sling.commons.scheduler.JobContext)
- */
+
+  /**
+   * update the batch size number of Authorizables whose countLastUpdate is null (never
+   * updated) or whose countLastUpdate is more than the update interval minutes ago
+   * {@inheritDoc}
+   * 
+   * @see org.apache.sling.commons.scheduler.Job#execute(org.apache.sling.commons.scheduler.JobContext)
+   */
   public void execute(JobContext context) {
     Session adminSession = null;
-    Integer batchSize = (Integer) context.getConfiguration().get(CountsRefreshScheduler.PROP_UPDATE_BATCH_SIZE);
+    Integer batchSize = (Integer) context.getConfiguration().get(
+        CountsRefreshScheduler.PROP_UPDATE_BATCH_SIZE);
     try {
       adminSession = this.sparseRepository.loginAdministrative();
       AuthorizableManager authManager = adminSession.getAuthorizableManager();
       SolrServer solrServer = solrServerService.getServer();
-      Long nowTicks = System.currentTimeMillis();
-      Long updateIntervalTicks = this.countProvider.getUpdateIntervalMinutes() * 60 * 1000;
-      Long updateTicks = nowTicks - updateIntervalTicks;
-//      -(-myfield:[start TO finish] AND myfield:[* TO *])
-      // find all the authorizables whose countLastUpdate was more than update interval ago or who have never been updated
-      StringBuilder querySB = new StringBuilder("+resourceType:authorizable AND -(-countLastUpdate:[0 TO ")
-                                   .append(updateTicks).append("] AND countLastUpdate[* TO *])");
-      String queryString = querySB.toString(); 
+      long nowTicks = System.currentTimeMillis();
+      long updateIntervalTicks = this.countProvider.getUpdateIntervalMinutes() * 60 * 1000;
+      long updateTicks = nowTicks - updateIntervalTicks;
+      // find all the authorizables have not been updated in the update interval
+      // or who have never been updated
+      StringBuilder querySB = new StringBuilder("+resourceType:authorizable AND -countLastUpdate:[")
+                              .append(updateTicks).append(" TO * ]");
+      String queryString = querySB.toString();
       SolrQuery solrQuery = new SolrQuery(queryString).setStart(0).setRows(batchSize);
       QueryResponse response;
       try {
         response = solrServer.query(solrQuery);
         SolrDocumentList results = response.getResults();
         long numResults = results.getNumFound();
-        LOGGER.info("with query {}, found {} results", new Object[] { queryString, numResults });
-        batchSize = (int) (batchSize < numResults ? batchSize : numResults);
-        LOGGER.info("will update counts on max of {} authorizables", new Object[] { batchSize });
-        Long startTicks = System.currentTimeMillis();
-        int count = 0;
-        for (SolrDocument solrDocument : results) {
-          String authorizableId = (String) solrDocument.getFieldValue("id");
-          Authorizable authorizable = authManager.findAuthorizable(authorizableId);
-          if (authorizable != null) {
-            this.countProvider.update(authorizable, adminSession);
-            count++;
-          } else {
-            LOGGER.warn("couldn't find authorizable: " + authorizableId);
+        if (LOGGER.isDebugEnabled()) LOGGER.debug("with query {}, found {} results", new Object[] { queryString,
+            numResults });
+        if (numResults > 0) {
+          batchSize = (int) (batchSize < numResults ? batchSize : numResults);
+          LOGGER.info("will update counts on max of {} authorizables",
+              new Object[] { batchSize });
+          long startTicks = System.currentTimeMillis();
+          int count = 0;
+          for (SolrDocument solrDocument : results) {
+            String authorizableId = (String) solrDocument.getFieldValue("id");
+            Authorizable authorizable = authManager.findAuthorizable(authorizableId);
+            if (authorizable != null) {
+              this.countProvider.update(authorizable, adminSession);
+              count++;
+            } else {
+              LOGGER.warn("couldn't find authorizable: " + authorizableId);
+            }
           }
+          long endTicks = System.currentTimeMillis();
+          LOGGER.info("updated {} authorizables in {} seconds", new Object[] { count,
+              (endTicks - startTicks) / 1000 });
+        } else {
+          LOGGER.info("All authorizables have up to date counts");
         }
-        Long endTicks = System.currentTimeMillis();
-        LOGGER.info("updated {} authorizables in {} seconds", new Object[] { count,
-            (endTicks - startTicks) / 1000 });
       } catch (SolrServerException e) {
         LOGGER.warn(e.getMessage(), e);
       }

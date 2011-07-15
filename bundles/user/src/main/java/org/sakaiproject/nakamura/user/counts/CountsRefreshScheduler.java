@@ -41,12 +41,12 @@ public class CountsRefreshScheduler {
   @Reference
   protected CountProvider countProvider;
   
-  @Property(longValue = 60, label = "Refresh Interval Seconds",
+  @Property(longValue = 300, label = "Refresh Interval Seconds",
           description = "How often to wake up and update a batch of authorizables")
   protected static final String PROP_POLL_INTERVAL_SECONDS = "refreshcounts.pollinterval";
   
-  @Property(intValue = 100, label = "Batch Size of Authorizables to Update in one Job",
-      description = "Number of Authorizables to Update in one Job")
+  @Property(intValue = 500, label = "Maximum Batch Size of Authorizables to Update in one Job",
+      description = "Maximum Number of Authorizables to Update in one Job")
   public static final String PROP_UPDATE_BATCH_SIZE = "refreshcounts.batchsize";  
 
   protected final static String JOB_NAME = "refreshCountsJob";
