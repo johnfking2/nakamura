@@ -7,9 +7,10 @@ import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_USER_MANAGER;
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_NEEDS_PROCESSING;
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_CUSTOM_MIMETYPE;
+import static org.sakaiproject.nakamura.api.files.FilesConstants.SAKAI_DESCRIPTION;
+import static org.sakaiproject.nakamura.api.files.FilesConstants.SAKAI_TAGS;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 
 import org.apache.felix.scr.annotations.Properties;
 import org.apache.felix.scr.annotations.Property;
@@ -33,7 +34,6 @@ import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
 import org.sakaiproject.nakamura.api.doc.ServiceExtension;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
-import org.sakaiproject.nakamura.api.files.FilesConstants;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
 import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.Session;
@@ -58,8 +58,8 @@ import org.sakaiproject.nakamura.files.cp.Item;
 import org.sakaiproject.nakamura.files.cp.Manifest;
 import org.sakaiproject.nakamura.files.cp.Organization;
 import org.sakaiproject.nakamura.files.cp.Resource;
+import org.sakaiproject.nakamura.files.lom.General;
 import org.sakaiproject.nakamura.files.lom.Keyword;
-import org.sakaiproject.nakamura.files.lom.LOMRoot;
 import org.sakaiproject.nakamura.files.lomcp.ManifestErrorException;
 import org.sakaiproject.nakamura.util.ActivityUtils;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
@@ -199,11 +199,6 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
           }
         }
       }
-      
-      System.out.println("==========================================================");
-      System.out.println(results.get("_contentItem"));
-      System.out.println("==========================================================");
-
       // Make sure we're outputting proper json.
       if ( statusCode == HttpServletResponse.SC_BAD_REQUEST ) {
         response.setStatus(statusCode);
@@ -276,92 +271,74 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
       String baseDir = poolId;
       String filename = "imsmanifest.xml";
       //To record whether there is manifest.xml.
-      boolean flag = false; 
+      boolean manifestFlag = false; 
       HashMap<String, String> fileContent = new HashMap<String, String>();
+      List<String> filePaths = new ArrayList<String>();
       Manifest manifest = new Manifest();
       while ((entry = zin.getNextEntry()) != null) {
+        filePaths.add(entry.getName());
         if (filename.equalsIgnoreCase(entry.getName())) {
-          BufferedReader reader = new BufferedReader(new InputStreamReader(new InputStream () {
-            public int read() {
-              try {
-                return zin.read();
-              } catch (IOException e) {
-                LOGGER.warn(e.getMessage(), e);
-                return -1;
-              }
-            }
-          }));
-          StringBuilder builder = new StringBuilder();
-          char[] chars = new char[40960];
-          int length = 0;
-          while (0 < (length = reader.read(chars))) {
-            if (length < 40960)
-              length--;
-            builder.append(chars, 0, length);
-          }
-          
-          JSONObject json = XML.toJSONObject(builder.toString());
-          manifest = new Manifest(json, "", "imsmd:");
-          try {
-            String courseName = manifest.getMetadata().getLom().getGeneral().getTitle().getLangString().getString();
-            content.setProperty(POOLED_CONTENT_FILENAME, courseName);
-          } catch (Exception e) { }
-          if (!contentProperties.containsKey(POOLED_CONTENT_FILENAME)) {
-            contentProperties.put(POOLED_CONTENT_FILENAME, value.getFileName().substring(0, value.getFileName().lastIndexOf('.')));
-          }
-          flag = true;
-          LOGGER.info("imsmanifest file excuted" + baseDir + "/" + filename);
-          contentManager.writeBody(baseDir + "/" + filename, new ByteArrayInputStream(builder.toString().getBytes()));
-          
-          continue;
-        }
-        String entryType = getServletContext().getMimeType(entry.getName());
-        if (entryType != null && entryType.contains("text")) {
-          BufferedReader reader = new BufferedReader(new InputStreamReader(new InputStream () {
-            public int read() {
-              try {
-                return zin.read();
-              } catch (IOException e) {
-                LOGGER.warn(e.getMessage(), e);
-                return -1;
-              }
-            }
-          }));
+          BufferedReader reader = new BufferedReader(new InputStreamReader(getInputStream(zin)));
           StringBuilder builder = new StringBuilder();
           char[] chars = new char[4096];
           int length = 0;
           while (0 < (length = reader.read(chars))) {
             builder.append(chars, 0, length);
           }
-          fileContent.put(entry.getName(), builder.toString());
-       //   contentManager.writeBody(baseDir + "/" + entry.getName(), new ByteArrayInputStream(builder.toString().getBytes()));
+          String xmlContent = builder.toString();
+          // Abandon the last character, otherwise there will be parse error in toJSONObject method
+          xmlContent = xmlContent.substring(0, xmlContent.length() - 1);
+          JSONObject json = XML.toJSONObject(xmlContent);
+          manifest = new Manifest(json, "", "imsmd:");
+          manifestFlag = true;
+          contentManager.writeBody(baseDir + "/" + filename, new ByteArrayInputStream(builder.toString().getBytes()));
           continue;
         }
-        LOGGER.info("file excuted" + baseDir + "/" + entry.getName());
-        contentManager.writeBody(baseDir + "/" + entry.getName(), new InputStream() {
-          public int read() {
-            try {
-              return zin.read();
-            } catch (IOException e) {
-              LOGGER.warn(e.getMessage(), e);
-              return -1;
-            }
-          }
-        });
-        
+        String entryType = getServletContext().getMimeType(entry.getName());
+        if (entryType != null && entryType.contains("text")) {
+          BufferedReader reader = new BufferedReader(new InputStreamReader(getInputStream(zin)));
+          StringBuilder builder = new StringBuilder();
+          char[] chars = new char[4096];
+          int length = 0;
+          while (0 < (length = reader.read(chars))) {
+            builder.append(chars, 0, length);
+          }          
+          fileContent.put(entry.getName(), builder.toString());
+          contentManager.writeBody(baseDir + "/" + entry.getName(), new ByteArrayInputStream(builder.toString().getBytes()));
+          continue;
+        }
+        contentManager.writeBody(baseDir + "/" + entry.getName(), getInputStream(zin));
       }
       zin.closeEntry();
       zin.close();
-      if (!flag) {
+      if (!manifestFlag) {
         throw new ServletException("There is no manifest file in the course.", new Exception("There is no manifest file in the course."));
       }
+      //Replace relative file path to JCR path
+      for (String key : fileContent.keySet()) {
+        String htmlContent = fileContent.get(key);
+        String prefix = "";
+        if (key.lastIndexOf('/') > 0)
+          prefix = key.substring(0, key.lastIndexOf('/') + 1);
+        if (filePaths != null && filePaths.size() > 0) {
+          for (String s : filePaths) {
+            if (s.length() <= prefix.length() || s.indexOf(prefix) < 0)
+              continue;
+            s = s.substring(prefix.length());
+            htmlContent = htmlContent.replaceAll("\"" + s + "\"", "\"" + "p/" + poolId + "/" + prefix + s + "\"");
+          }
+        }
+        fileContent.put(key, htmlContent);
+      }      
       
       JSONObject pageSetJSON = manifestToPageSet(manifest, poolId, fileContent);
-      
       Iterator<String> keys = pageSetJSON.keys();
       while (keys.hasNext()) {
         String key = keys.next();
         content.setProperty(key, pageSetJSON.optString(key));
+      }
+      if (!content.hasProperty(POOLED_CONTENT_FILENAME)) {
+        contentProperties.put(POOLED_CONTENT_FILENAME, value.getFileName().substring(0, value.getFileName().lastIndexOf('.')));
       }
       contentManager.update(content);
 
@@ -418,34 +395,77 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
     }
     return contentType;
   }
-
+  /**
+   * Get Inputstream from ZipInputStream
+   * @param zin
+   * @return
+   */
+  private InputStream getInputStream(final ZipInputStream zin) {
+    return new InputStream() {
+      public int read() {
+        try {
+          return zin.read();
+        } catch (IOException e) {
+          LOGGER.warn(e.getMessage(), e);
+          return -1;
+        }
+      }
+    };
+  }
+  
   private String generatePoolId() throws UnsupportedEncodingException,
       NoSuchAlgorithmException {
     return clusterTrackingService.getClusterUniqueId();
   }
-  
-  private JSONObject manifestToPageSet(Manifest manifest, String poolId, HashMap<String, String> fileContent) throws JSONException {
+  /**
+   * Turn manifest structure to Sakai doc structure
+   * @param manifest
+   * @param poolId
+   * @param fileContent
+   * @return
+   * @throws JSONException
+   */
+  private JSONObject manifestToPageSet(Manifest manifest, String poolId, 
+      HashMap<String, String> fileContent) throws JSONException {
     JSONObject pages = new JSONObject();
     List<Organization> orgs = manifest.getOrganizations().getOrganizations();
     int index = 0;
     String description = "";
-    JSONArray keywords = new JSONArray();
+    
     JSONArray allResources = new JSONArray();
-    try {
-      description = manifest.getMetadata().getLom().getGeneral().getDescription().get(0).getLangString().getString();
-      List<Keyword> keys = manifest.getMetadata().getLom().getGeneral().getKeyword();
-      if (keys != null) {
-        for (Keyword key : keys)
-          keywords.put(key.getLangString().getString());
+    String keywords = "";
+    String courseName = "";
+    if (manifest.getMetadata() != null) {
+      if (manifest.getMetadata().getLom() != null) {
+        if (manifest.getMetadata().getLom().getGeneral() != null ) {
+          General general = manifest.getMetadata().getLom().getGeneral();
+          if (general.getDescription() != null && general.getDescription().size() != 0) {
+            description = manifest.getMetadata().getLom().getGeneral().getDescription().get(0).getLangString().getString();
+          }
+          if (general.getKeyword() != null && general.getKeyword().size() != 0) {
+            List<Keyword> keys = manifest.getMetadata().getLom().getGeneral().getKeyword();
+            if (keys != null) {
+              for (int i = 0; i < keys.size(); i++) {
+                if ( i > 0)
+                  keywords += ",";
+                keywords += keys.get(i).getLangString().getString();
+              }
+            }
+          }
+          if (general.getTitle() != null) {
+            courseName = general.getTitle().getLangString().getString();
+          }
+        }
       }
-    } catch (Exception e) { }
-    pages.put("sakai:description", description);
+    }
+    pages.put(SAKAI_DESCRIPTION, description);
+    pages.put(POOLED_CONTENT_FILENAME, courseName);
     if (keywords.length() != 0)
-      pages.put("sakai:tags", keywords);
+      pages.put(SAKAI_TAGS, keywords);
+    JSONObject orgJSON = new JSONObject();
     if (orgs != null && orgs.size() != 0) {
       for (int i = 0; i < orgs.size(); i++) {
         Vector<Item> items = getLeafItems(orgs.get(i));
-        JSONObject orgJSON = new JSONObject();
         JSONObject itemJSON = new JSONObject();
         String itemID = "";
         for (int j = 0; j < items.size(); j++) {
@@ -461,6 +481,7 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
               itemJSON.put("_order", index++);
               itemJSON.put("_canEdit", false);
               itemJSON.put("_canSubedit", false);
+              itemJSON.put("_nonEditable", true);
               itemJSON.put("_poolpath", "/p/" + poolId);
               JSONObject resourceJSON = new JSONObject();
        //       String resID = StorageClientUtils.insecureHash(res.getHref());
@@ -479,12 +500,10 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
               }
               resourceJSON.put("_dependencyPaths", fileArray);
               resourceJSON.put("page", fileContent.get(res.getHref()));
-            //  pages.put("res" + resID, resourceJSON);
               itemJSON.put("_ref", resID);
-             // JSONObject resource = new JSONObject();
-             // resource.put(resID, resourceJSON);
               allResources.put(resourceJSON);
-              JSONObject mainObject = new JSONObject(itemJSON, new String[] {"_title", "_ref", "_canEdit", "_canSubedit", "_poolpath"});
+              JSONObject mainObject = new JSONObject(itemJSON, 
+                  new String[] {"_title", "_ref", "_canEdit", "_canSubedit", "_nonEditable", "_poolpath"});
               mainObject.put("_order", 0);
               mainObject.put("_id", "main");
               mainObject.put("_elements", new JSONArray());
@@ -501,18 +520,24 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
             }
           }
         }
-        pages.put("structure" + i, orgJSON);
       }
+      pages.put("structure0", orgJSON);
       pages.put("resources", allResources);
     }
     return pages; 
   }
-  
-  private static Vector<Item> getLeafItems(HasItem org) {
+  /**
+   * Return the leaf items and item contains resource
+   * @param org
+   * @return
+   */
+  private Vector<Item> getLeafItems(HasItem org) {
     Vector<Item> result = new Vector<Item>();
     
     for (Item item : org.getItems()) {
       if (item.hasSubItems()) {
+        if (item.getIdentifierRef() != null)
+          result.add(item);
         result.addAll(getLeafItems(item));
       } else {
         result.add(item);
