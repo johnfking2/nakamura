@@ -92,4 +92,20 @@ public class Organizations extends Serialize {
   public void setOrganizations(List<Organization> organizations) {
     this.organizations = organizations;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder head = new StringBuilder("<organizations");
+    StringBuilder sb = new StringBuilder("");
+    if (this.getDefaultID() != null) {
+      head.append(" default=\"" + this.getDefaultID() + "\"");
+    }
+    if (this.getOrganizations() != null) {
+      for (int i = 0; i < this.getOrganizations().size(); i++){
+        sb.append(this.getOrganizations().get(i).generateXML());
+      }
+    }
+    
+    return new String(head.toString() + ">" + sb.toString() + "</organizations>");
+  }
 }

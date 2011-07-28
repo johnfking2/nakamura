@@ -93,5 +93,17 @@ public class HasItem extends HasMetadata{
     return true;
   }
 
-  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder(super.generateXML());
+    if (this.getTitle() != null)
+      sb.append("<title>" + this.getTitle() + "</title>");
+    if (this.hasSubItems()) {
+      for (int i = 0; i < this.getItems().size(); i++)
+        sb.append(this.getItems().get(i).generateXML());
+    }
+    if (sb.toString().equals(""))
+      return sb.toString();
+    return new String("" + sb.toString() + "");
+  }
 }

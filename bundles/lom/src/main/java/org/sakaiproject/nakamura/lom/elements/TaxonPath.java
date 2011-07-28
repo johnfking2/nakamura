@@ -67,5 +67,19 @@ public class TaxonPath extends Serialize {
     this.taxon = taxon;
   }
 
-
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getSource() != null) {
+      sb.append(this.getSource().generateXML());
+    }
+    if (this.getTaxon() != null) {
+      for (int i = 0; i < this.getTaxon().size(); i++) {
+        sb.append(this.getTaxon().get(i).generateXML());
+      }
+    }
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<taxonPath>" + sb.toString() + "</taxonPath>");
+  }
 }

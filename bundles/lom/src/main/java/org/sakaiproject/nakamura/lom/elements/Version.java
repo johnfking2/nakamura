@@ -11,4 +11,11 @@ public class Version extends LangStringType {
   public Version(JSONObject json) {
     super(json);
   }
+  
+  @Override
+  public String generateXML() {
+    if (this.getLangString().generateXML().equals(""))
+      return "";
+    return new String("<version>" + this.getLangString().generateXML() + "</version>");
+  }
 }

@@ -187,6 +187,7 @@ public class General extends Serialize{
     if (language == null) {
       language = new ArrayList<String>();
     }
+    language.add(l);
   }
   
   public void setLanguage(List<String> language) {
@@ -234,5 +235,36 @@ public class General extends Serialize{
 
   public void setAggregationLevel(AggregationLevel aggregationLevel) {
     this.aggregationLevel = aggregationLevel;
+  }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getIdentifier() != null) {
+      for (int i = 0; i < this.getIdentifier().size(); i++)
+        sb.append(this.getIdentifier().get(i).generateXML());
+    }
+    if (this.getTitle() != null)
+      sb.append(this.getTitle().generateXML());
+    if (this.getKeyword() != null) 
+      for (int i = 0; i < this.getKeyword().size(); i++)
+        sb.append(this.getKeyword().get(i).generateXML());
+    if (this.getDescription() != null) 
+      for (int i = 0; i < this.getDescription().size(); i++)
+        sb.append(this.getDescription().get(i).generateXML());
+    if (this.getLanguage() != null)
+      for (int i = 0;i < this.getLanguage().size(); i++)
+        sb.append("<language>" + this.getLanguage().get(i)+ "</language>");
+    if (this.getStructure() != null)
+      sb.append(this.getStructure().generateXML());
+    if (this.getAggregationLevel() != null)
+      sb.append(this.getAggregationLevel().generateXML());
+    if (this.getCoverage() != null) 
+      for (int i = 0; i < this.getCoverage().size(); i++)
+        sb.append(this.getCoverage().get(i).generateXML());
+    
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<general>" + sb.toString() + "</general>");
   }
 }

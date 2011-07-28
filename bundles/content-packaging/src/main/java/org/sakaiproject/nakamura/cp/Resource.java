@@ -28,7 +28,7 @@ public class Resource extends HasMetadata {
     String fileName = "file";
     String dependencyName = "dependency";
     String typeName = "type";
-    String xmlBaseName = "xmlbase";
+    String xmlBaseName = "base";
     String hrefName = "href";
     JSONObject fileJSON = JSONUtil.getJSONObject(json, fileName);
     if (fileJSON == null) {
@@ -119,5 +119,36 @@ public class Resource extends HasMetadata {
   
   public void setHref(String href) {
     this.href = href;
+  }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder(super.generateXML());
+    StringBuilder head = new StringBuilder("<resource");
+    if (this.getIdentifier() != null) {
+      head.append(" identifier=\"" + this.getIdentifier() + "\"");
+    }
+    if (this.getType() != null) {
+      head.append(" type=\"" + this.getType() + "\"");
+    }
+    if (this.getXmlBase() != null) {
+      head.append(" xml:base=\"" + this.getXmlBase() + "\"");
+    }
+    if (this.getHref() != null) {
+      head.append(" href=\"" + this.getHref() + "\"");
+    }
+    if (this.getFiles() != null) {
+      for (int i = 0; i < this.getFiles().size(); i++) {
+        sb.append(this.getFiles().get(i).generateXML());
+      }
+    }
+    if (this.getDependencies() != null) {
+      for (int i = 0; i < this.getDependencies().size(); i++) {
+        sb.append(this.getDependencies().get(i).generateXML());
+      }
+    }
+    if (sb.toString().equals("") && head.equals("<resource"))
+      return sb.toString();
+    return new String(head.toString() + ">" + sb.toString() + "</resource>");
   }
 }

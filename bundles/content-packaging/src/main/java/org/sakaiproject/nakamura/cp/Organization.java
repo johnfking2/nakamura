@@ -28,4 +28,17 @@ public class Organization extends HasItem {
   public void setStructure(String structure) {
     this.structure = structure;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder head = new StringBuilder("<organization");
+    StringBuilder sb = new StringBuilder(super.generateXML());
+    if (this.getIdentifier() != null)
+      head.append(" identifier=\"" + this.getIdentifier() + "\"");
+    if (this.getStructure() != null)
+      head.append(" structure=\"" + this.getStructure() + "\"");
+    if (sb.toString().equals("") && head.toString().equals("<organization"))
+      return sb.toString();
+    return new String(head + ">" + sb.toString() + "</organization>");
+  }
 }

@@ -11,4 +11,11 @@ public class Date extends DateTimeType {
   public Date(JSONObject json) {
     super(json);
   }
+  
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<date>" + super.generateXML() + "</date>");
+  }
 }

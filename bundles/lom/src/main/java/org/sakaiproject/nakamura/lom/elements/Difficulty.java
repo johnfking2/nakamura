@@ -20,4 +20,10 @@ public class Difficulty extends VocabularyType {
     return vocabulary;
   }
 
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<difficulty>" + super.generateXML() + "</difficulty>");
+  }
 }

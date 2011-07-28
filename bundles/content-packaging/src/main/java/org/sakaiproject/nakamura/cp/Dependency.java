@@ -21,11 +21,20 @@ public class Dependency extends Serialize {
     identifierref = JSONUtil.getStringValue(json, identifierrefName);    
   }
   
-  public String getIdentiferRef() {
+  public String getIdentifierRef() {
     return identifierref;
   }
   
   public void setIdentifierRef(String id) {
     this.identifierref = id;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getIdentifierRef() != null) {
+      sb.append("<dependency identifierref=\"" + this.getIdentifierRef() + "\" />");
+    }
+    return sb.toString();
+  }  
 }

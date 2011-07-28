@@ -44,4 +44,18 @@ public class Taxon extends Serialize {
   public void setEntry(Entry entry) {
     this.entry = entry;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getId() != null) {
+      sb.append("<id>" + this.getId() + "</id>");
+    }
+    if (this.getEntry() != null) {
+      sb.append(this.getEntry().generateXML());
+    }
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<taxon>" + sb.toString() + "</taxon>");
+  }
 }

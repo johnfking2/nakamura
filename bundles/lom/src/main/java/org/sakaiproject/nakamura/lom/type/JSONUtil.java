@@ -20,7 +20,7 @@ public class JSONUtil {
         String s = names.next();
         if (s.length() < elementName.length())
           continue;
-        if (elementName.equalsIgnoreCase(s) || s.toLowerCase().endsWith(":" + elementName)) {
+        if (elementName.equalsIgnoreCase(s) || s.toLowerCase().endsWith(":" + elementName.toLowerCase())) {
           return json.optJSONObject(s);
         }
        }
@@ -37,7 +37,7 @@ public class JSONUtil {
         String s = names.next();
         if (s.length() < elementName.length())
           continue;
-        if (elementName.equalsIgnoreCase(s) || s.toLowerCase().endsWith(":" + elementName)) {
+        if (elementName.equalsIgnoreCase(s) || s.toLowerCase().endsWith(":" + elementName.toLowerCase())) {
           return json.optJSONArray(s);
         }
        }
@@ -46,6 +46,8 @@ public class JSONUtil {
   }
   
   public static String getStringValue(JSONObject json, String elementName) {
+    if (getJSONObject(json, elementName) != null || getJSONArray(json, elementName) != null)
+      return null;
     if (json.optString(elementName) != null && !("".equals(json.optString(elementName))))
       return json.optString(elementName);
     Iterator<String> names = json.keys();
@@ -54,12 +56,11 @@ public class JSONUtil {
         String s = names.next();
         if (s.length() < elementName.length())
           continue;
-        if (elementName.equalsIgnoreCase(s) || s.toLowerCase().endsWith(":" + elementName)) {
+        if (elementName.equalsIgnoreCase(s) || s.toLowerCase().endsWith(":" + elementName.toLowerCase())) {
           return json.optString(s);
         }
        }
     }
     return null;
   }
-
 }

@@ -41,5 +41,16 @@ public class Identifier extends Serialize {
   public void setEntry(String entry) {
     this.entry = entry;
   }
-
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getCatalog() != null)
+      sb.append("<catalog>" + this.getCatalog() + "</catalog>");
+    if (this.getEntry() != null)
+      sb.append("<entry>" + this.getEntry() + "</entry>");
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<identifier>" + sb.toString() + "</identifier>");
+  }
 }

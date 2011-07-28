@@ -86,4 +86,20 @@ public class Resource extends Serialize {
   public void setDescription(List<Description> description) {
     this.description = description;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getDescription() != null) {
+      for (int i = 0; i < this.getDescription().size(); i++) 
+        sb.append(this.getDescription().get(i).generateXML());
+    }
+    if (this.getIdentifier() != null) {
+      for (int i = 0; i < this.getIdentifier().size(); i++) 
+        sb.append(this.getIdentifier().get(i).generateXML());
+    }
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<resource>" + sb.toString() + "</resource>");
+  }
 }

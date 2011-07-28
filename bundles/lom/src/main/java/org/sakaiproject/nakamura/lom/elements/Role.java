@@ -41,5 +41,12 @@ public class Role extends VocabularyType {
   public Contribute.CONTRIBUTETYPE getRoleType() {
     return belongsTo;
   }
+  
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<role>" + super.generateXML() + "</role>");
+  }
 
 }

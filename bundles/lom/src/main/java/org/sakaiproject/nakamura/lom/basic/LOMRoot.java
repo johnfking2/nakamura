@@ -1,7 +1,9 @@
 package org.sakaiproject.nakamura.lom.basic;
 
 import org.apache.sling.commons.json.JSONArray;
+import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.JSONObject;
+import org.apache.sling.commons.json.xml.XML;
 import org.sakaiproject.nakamura.lom.type.JSONUtil;
 import org.sakaiproject.nakamura.lom.type.Serialize;
 
@@ -24,8 +26,12 @@ public class LOMRoot extends Serialize{
   }
   
   public LOMRoot(JSONObject json) {
-    this.setJson(json, "lom");
+    this.setJSON(json, "lom");
     this.init();
+  }
+  
+  public LOMRoot(String xmlcontent) throws JSONException {
+    this(XML.toJSONObject(xmlcontent));
   }
   
   @Override
@@ -120,17 +126,12 @@ public class LOMRoot extends Serialize{
     }
   }
   
-  public void setJson(JSONObject json, String lomName) {
+  private void setJSON(JSONObject json, String lomName) {
     JSONObject lomObject = JSONUtil.getJSONObject(json, lomName);
     this.json = lomObject;
     if (lomObject == null) {
       this.json = new JSONObject();
     }
-    
-  }
-
-  public JSONObject getJson() {
-    return json;
   }
   
   public General getGeneral() {
@@ -229,5 +230,34 @@ public class LOMRoot extends Serialize{
 
   public void setClassification(List<Classification> classification) {
     this.classification = classification;
+  }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getGeneral() != null)
+      sb.append(this.getGeneral().generateXML());
+    if (this.getLifeCycle() != null)
+      sb.append(this.getLifeCycle().generateXML());
+    if (this.getMetaMetadata() != null)
+      sb.append(this.getMetaMetadata().generateXML());
+    if (this.getTechnical() != null)
+      sb.append(this.getTechnical().generateXML());
+    if (this.getEducational() != null) {
+      for (int i = 0; i < this.getEducational().size(); i++)
+        sb.append(this.getEducational().get(i).generateXML());
+    }
+    if (this.getRights() != null)
+      sb.append(this.getRights().generateXML());
+    if (this.getRelation() != null)
+      for (int i = 0; i < this.getRelation().size(); i++)
+        sb.append(this.getRelation().get(i).generateXML());
+    if (this.getAnnotation() != null)
+      for (int i = 0; i < this.getAnnotation().size(); i++)
+        sb.append(this.getAnnotation().get(i).generateXML());
+    if (this.getClassification() != null)
+      for (int i = 0; i < this.getClassification().size(); i++)
+        sb.append(this.getClassification().get(i).generateXML());
+    return new String("<lom>" + sb.toString() + "</lom>");
   }
 }

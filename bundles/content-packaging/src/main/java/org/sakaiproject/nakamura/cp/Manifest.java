@@ -3,6 +3,7 @@ package org.sakaiproject.nakamura.cp;
 import org.apache.sling.commons.json.JSONArray;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.JSONObject;
+import org.apache.sling.commons.json.xml.XML;
 import org.sakaiproject.nakamura.lom.type.JSONUtil;
 
 import java.util.ArrayList;
@@ -27,6 +28,10 @@ public class Manifest {
     this.setJSON(json, "manifest");
     this.init();
   }
+  
+  public Manifest(String xmlcontent) throws ManifestErrorException, JSONException { 
+    this(XML.toJSONObject(xmlcontent));
+  }
 
   protected void init() throws ManifestErrorException{
     String organizationsName = "organizations";
@@ -34,7 +39,7 @@ public class Manifest {
     String manifestName = "manifest";
     String identifierName = "identifier";
     String versionName = "version";
-    String xmlBaseName = "xmlbase";
+    String xmlBaseName = "base";
     String metadataName = "metadata";
     String lomName = "lom";
     
@@ -56,7 +61,10 @@ public class Manifest {
     if (metaJSON !=null) {
       metadata = new Metadata(metaJSON);
     } else {
-      if (JSONUtil.getJSONObject(json, lomName) != null) {
+      JSONObject object = JSONUtil.getJSONObject(json, "manifestMetadata");
+      if (object != null) {
+        metadata = new Metadata(object);
+      } else if (JSONUtil.getJSONObject(json, lomName) != null) {
         metadata = new Metadata(json);
       }
     }
@@ -92,7 +100,7 @@ public class Manifest {
     version = JSONUtil.getStringValue(json, versionName);
   }  
   
-  protected void setJSON(JSONObject json, String manifestName) throws ManifestErrorException{
+  private void setJSON(JSONObject json, String manifestName) throws ManifestErrorException{
     JSONObject j = JSONUtil.getJSONObject(json, manifestName);
     if (j == null)
       throw new ManifestErrorException("Manifest element is not found");
@@ -158,5 +166,28 @@ public class Manifest {
 
   public void setMetadata(Metadata metadata) {
     this.metadata = metadata;
+  }
+  
+  public String generateXML() {
+    StringBuilder head = new StringBuilder("<manifest");
+    StringBuilder sb = new StringBuilder("");
+    if (this.getMetadata() != null)
+      sb.append(this.getMetadata().generateXML());
+    if (this.getIdentifier() != null)
+      head.append(" identifier=\"" + this.getIdentifier() + "\"");
+    if (this.getVersion() != null)
+      head.append(" version=\"" + this.getVersion() + "\"");
+    if (this.getXmlBase() != null)
+      head.append(" xml:base=\"" + this.getXmlBase() + "\"");
+    if (this.getOrganizations() != null)
+      sb.append(this.getOrganizations().generateXML());
+    if (this.getResources() != null)
+      sb.append(this.getResources().generateXML());
+    if (this.getSubManifests() != null) {
+      for (int i = 0; i < this.getSubManifests().size(); i++) {
+        sb.append(this.getSubManifests().get(i).generateXML());
+      }
+    }
+    return new String(head.toString() + ">" + sb.toString() + "</manifest>");
   }
 }

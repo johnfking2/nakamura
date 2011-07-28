@@ -247,7 +247,7 @@ public class ImportIMSCPServlet extends SlingAllMethodsServlet {
         }
         String xmlContent = builder.toString();
         // Abandon the last character, otherwise there will be parse error in toJSONObject method
-        xmlContent = xmlContent.substring(0, xmlContent.length() - 1);
+        xmlContent = xmlContent.substring(0, xmlContent.lastIndexOf('>') + 1);
         JSONObject json = XML.toJSONObject(xmlContent);
         manifest = new Manifest(json);
         manifestFlag = true;

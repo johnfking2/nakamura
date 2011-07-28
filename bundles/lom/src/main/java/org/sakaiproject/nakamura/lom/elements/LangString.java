@@ -42,4 +42,13 @@ public class LangString extends Serialize {
   public void setString(String string) {
     this.string = string;
   }
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getLanguage() != null)
+      sb.append("<language>" + this.getLanguage() + "</language>");
+    if (this.getString() != null) 
+      sb.append("<string>" + this.getString() + "</string>");
+    return sb.toString();
+  }
 }

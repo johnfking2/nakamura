@@ -41,4 +41,18 @@ public abstract class DateTimeType extends Serialize {
   public void setDescription(Description description) {
     this.description = description;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getDateTime() != null) {
+      sb.append("<dateTime>" + this.getDateTime() + "</dateTime>");
+    }
+    if (this.getDescription() != null) {
+      sb.append(this.getDescription().generateXML());
+    }
+    if (sb.toString().equals(""))
+      return "";
+    return sb.toString();
+  }
 }

@@ -63,4 +63,18 @@ public class Rights extends Serialize {
   public void setDescription(Description description) {
     this.description = description;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getCopyrightAndOtherRestrictions() != null)
+      sb.append(this.getCopyrightAndOtherRestrictions().generateXML());
+    if (this.getCost() != null)
+      sb.append(this.getCost().generateXML());
+    if (this.getDescription() != null)
+      sb.append(this.getDescription().generateXML());    
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<rights>" + sb.toString() + "</rights>");
+  }
 }

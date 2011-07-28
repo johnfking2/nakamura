@@ -27,7 +27,7 @@ public abstract class LangStringType extends Serialize {
         }
       } else {
         langString = new LangString();
-        langString.setString(JSONUtil.getStringValue(json, langStringName));
+        langString.setString(content);
       }
     } else {
       langString = new LangString(langStringObject);

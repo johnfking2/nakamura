@@ -24,7 +24,7 @@ public class Resources extends Serialize {
   @Override
   protected void init() {
     String resourceName = "resource";
-    String xmlBaseName = "xmlbase";
+    String xmlBaseName = "base";
     JSONObject resourceJSON = JSONUtil.getJSONObject(json, resourceName);
     if (resourceJSON == null) {
       JSONArray resourceArray = JSONUtil.getJSONArray(json, resourceName);
@@ -78,5 +78,21 @@ public class Resources extends Serialize {
 
   public void setXmlBase(String xmlBase) {
     this.xmlBase = xmlBase;
+  }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder head = new StringBuilder("<resources");
+    StringBuilder sb = new StringBuilder("");
+    if (this.getXmlBase() != null) {
+      head.append(" xml:base=\"" + this.getXmlBase() + "\"");
+    }
+    if (this.getResources() != null) {
+      for (int i = 0; i < this.getResources().size(); i++){
+        sb.append(this.getResources().get(i).generateXML());
+      }
+    }
+
+    return new String(head.toString() + ">" + sb.toString() + "</resources>");
   }
 }

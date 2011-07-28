@@ -20,4 +20,10 @@ public class Type extends VocabularyType {
     return vocabulary;
   }
 
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<type>" + super.generateXML() + "</type>");
+  }
 }

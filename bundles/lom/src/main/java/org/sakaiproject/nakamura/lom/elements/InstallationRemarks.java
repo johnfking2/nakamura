@@ -11,4 +11,11 @@ public class InstallationRemarks extends LangStringType {
   public InstallationRemarks(JSONObject json) {
     super(json);
   }
+  
+  @Override
+  public String generateXML() {
+    if (this.getLangString().generateXML().equals(""))
+      return "";
+    return new String("<installationRemarks>" + this.getLangString().generateXML() + "</installationRemarks>");
+  }
 }

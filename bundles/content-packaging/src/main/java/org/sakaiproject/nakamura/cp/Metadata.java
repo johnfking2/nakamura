@@ -26,7 +26,6 @@ public class Metadata extends Serialize {
     String lomName = "lom";
     schema = JSONUtil.getStringValue(json, schemaName);
     schemaVersion = JSONUtil.getStringValue(json, schemaVersionName);
-    
     JSONObject lomJSON = JSONUtil.getJSONObject(json, lomName);
     if (lomJSON != null) {
       lom = new LOMRoot(json);
@@ -56,5 +55,22 @@ public class Metadata extends Serialize {
 
   public void setLom(LOMRoot lom) {
     this.lom = lom;
+  }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getSchema() != null) {
+      sb.append("<schema>" + this.getSchema() + "</schema>");
+    }
+    if (this.getSchemaVersion() != null) {
+      sb.append("<schemaversion>" + this.getSchemaVersion() + "</schemaversion>");
+    }
+    if (this.getLom() != null) {
+      sb.append(this.getLom().generateXML());
+    }
+    if(sb.toString().equals(""))
+      return "";
+    return new String("<metadata>" + sb.toString() + "</metadata>");
   }
 }

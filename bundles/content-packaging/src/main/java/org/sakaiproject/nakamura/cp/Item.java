@@ -5,7 +5,7 @@ import org.sakaiproject.nakamura.lom.type.JSONUtil;
 
 public class Item extends HasItem {
   private String identifierRef;
-  private boolean isvisible;
+  private String isvisible;
   private String parameters;
 
   public Item() {
@@ -23,7 +23,7 @@ public class Item extends HasItem {
     String isvisibleName = "isvisible";
     String parametersName = "parameters";
     identifierRef = JSONUtil.getStringValue(json, identifierRefName);
-    isvisible = json.optBoolean(isvisibleName);
+    isvisible = JSONUtil.getStringValue(json, isvisibleName);
     parameters = JSONUtil.getStringValue(json, parametersName);
   }
   
@@ -35,11 +35,11 @@ public class Item extends HasItem {
     this.identifierRef = identifierRef;
   }
 
-  public boolean isIsvisible() {
+  public String getIsvisible() {
     return isvisible;
   }
 
-  public void setIsvisible(boolean isvisible) {
+  public void setIsvisible(String isvisible) {
     this.isvisible = isvisible;
   }
 
@@ -49,5 +49,26 @@ public class Item extends HasItem {
 
   public void setParameters(String parameters) {
     this.parameters = parameters;
+  }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder head = new StringBuilder("<item");
+    StringBuilder sb = new StringBuilder(super.generateXML());
+    if (this.getIdentifier() != null) {
+      head.append(" identifier=\"" + this.getIdentifier() + "\"");
+    }
+    if (this.getIdentifierRef() != null) {
+      head.append(" identifierref=\"" + this.getIdentifierRef() + "\"");
+    }
+    if (this.getIsvisible() != null) {
+      head.append(" isvisible=\"" + this.getIsvisible() + "\"");
+    }
+    if (this.getParameters() != null) {
+      head.append(" parameters=\"" + this.getParameters() + "\"");
+    }
+    if (sb.toString().equals("") && head.toString().equals("<item"))
+      return sb.toString();
+    return new String(head + ">" + sb.toString() + "</item>");
   }
 }

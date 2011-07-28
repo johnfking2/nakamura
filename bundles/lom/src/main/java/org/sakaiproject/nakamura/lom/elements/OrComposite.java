@@ -9,7 +9,7 @@ public class OrComposite extends Serialize {
   private Type type;
   private Name name;
   private String minimumVersion;
-  private String maxmumVersion;
+  private String maximumVersion;
 
   public OrComposite() {
     super();
@@ -24,17 +24,17 @@ public class OrComposite extends Serialize {
     String typeName = "type";
     String nameName = "name";
     String minimumVersionName = "minimumVersion";
-    String maxmumVersionName = "maxmumVersion";
+    String maxmumVersionName = "maximumVersion";
     JSONObject typeJSON = JSONUtil.getJSONObject(json, typeName);
     if (typeJSON != null) 
-      type = new Type(json);
+      type = new Type(typeJSON);
     
     JSONObject nameJSON = JSONUtil.getJSONObject(json, nameName);
     if (nameJSON != null)
-      name = new Name(json);
+      name = new Name(nameJSON);
     
     minimumVersion = JSONUtil.getStringValue(json, minimumVersionName);
-    maxmumVersion = JSONUtil.getStringValue(json, maxmumVersionName);
+    maximumVersion = JSONUtil.getStringValue(json, maxmumVersionName);
   }
   
   public Type getType() {
@@ -62,10 +62,26 @@ public class OrComposite extends Serialize {
   }
 
   public String getMaxmumVersion() {
-    return maxmumVersion;
+    return maximumVersion;
   }
 
-  public void setMaxmumVersion(String maxmumVersion) {
-    this.maxmumVersion = maxmumVersion;
+  public void setMaximumVersion(String maxmumVersion) {
+    this.maximumVersion = maxmumVersion;
+  }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getName() != null) 
+      sb.append(this.getName().generateXML());
+    if (this.getType() != null)
+      sb.append(this.getType().generateXML());
+    if (this.getMaxmumVersion() != null)
+      sb.append("<maximumVersion>" + this.getMaxmumVersion() + "</maximumVersion>");
+    if (this.getMinimumVersion() != null)
+      sb.append("<minimumVersion>" + this.getMinimumVersion() + "</minimumVersion>");
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<orComposite>" + sb.toString() + "</orComposite>");
   }
 }

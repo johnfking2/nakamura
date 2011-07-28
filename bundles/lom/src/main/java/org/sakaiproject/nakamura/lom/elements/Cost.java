@@ -20,4 +20,10 @@ public class Cost extends VocabularyType {
     return vocabulary;
   }
 
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String ("<cost>" + super.generateXML() + "</cost>");
+  }
 }

@@ -48,4 +48,17 @@ public class File extends Serialize {
   public void setMetadata(Metadata metadata) {
     this.metadata = metadata;
   }
+
+  @Override
+  public String generateXML() {
+    StringBuilder head = new StringBuilder("<file");
+    StringBuilder sb = new StringBuilder("");
+    if (this.getHref() != null)
+      head.append(" href=\"" + this.getHref() + "\"");
+    if (this.getMetadata() != null)
+      sb.append(this.getMetadata().generateXML());
+    if(sb.toString().equals("") && head.equals("<file"))
+      return "";
+    return new String(head.toString() + ">" + sb.toString() + "</file>");
+  }
 }

@@ -54,5 +54,18 @@ public class Requirement extends Serialize {
   public void setOrComposite(List<OrComposite> orComposite) {
     this.orComposite = orComposite;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getOrComposite() != null) {
+      for (int i = 0; i < this.getOrComposite().size(); i++) {
+        sb.append(this.getOrComposite().get(i).generateXML());
+      }
+    }
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<requirement>" + sb.toString() + "</requirement>");
+  }
 
 }

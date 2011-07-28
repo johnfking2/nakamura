@@ -1,25 +1,25 @@
 package org.sakaiproject.nakamura.lom.type;
 
+import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.JSONObject;
+import org.apache.sling.commons.json.xml.XML;
 
 public abstract class Serialize {
   protected JSONObject json;
   
   public Serialize() {
-    setJSON(json);
+    this.json = new JSONObject();
   }
   
   public Serialize(JSONObject json) {
     this.json = json;
     init();
   }
- 
-  public JSONObject getJSON() {
-    return json;
-  }
   
-  private void setJSON(JSONObject json) {
-    this.json = json;
+  public Serialize(String xmlContent) throws JSONException {
+    this(XML.toJSONObject(xmlContent));
   }
+ 
   protected abstract void init();
+  protected abstract String generateXML();
 }

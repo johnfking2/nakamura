@@ -44,4 +44,16 @@ public class Duration extends Serialize{
   public void setDescription(Description description) {
     this.description = description;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getDuration() != null)
+      sb.append("<duration>" + this.getDuration() + "</duration>");
+    if (this.getDescription() != null)
+      sb.append(this.getDescription().generateXML());
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<duration>" + sb.toString() + "</duration>");
+  }
 }

@@ -19,5 +19,12 @@ public class InteractivityType extends VocabularyType {
   public String[] getLOMVocabulary() {
     return vocabulary;
   }
+  
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<interactivityType>" + super.generateXML() + "</interactivityType>");
+  }
 
 }

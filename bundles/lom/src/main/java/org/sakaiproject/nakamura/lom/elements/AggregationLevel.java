@@ -19,5 +19,10 @@ public class AggregationLevel extends VocabularyType {
   public String[] getLOMVocabulary() {
     return vocabulary;
   }
-
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String ("<aggregationLevel>" + super.generateXML() + "</aggregationLevel>");
+  }
 }

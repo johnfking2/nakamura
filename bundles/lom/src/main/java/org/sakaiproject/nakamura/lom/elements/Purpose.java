@@ -21,4 +21,10 @@ public class Purpose extends VocabularyType {
     return vocabulary;
   }
 
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<purpose>" + super.generateXML() + "</purpose>");
+  }
 }

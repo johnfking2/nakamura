@@ -19,5 +19,10 @@ public class CopyrightAndOtherRestrictions extends VocabularyType {
   public String[] getLOMVocabulary() {
     return vocabulary;
   }
-
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<copyrightAndOtherRestrictions>" + super.generateXML() + "</copyrightAndOtherRestrictions>");
+  }
 }

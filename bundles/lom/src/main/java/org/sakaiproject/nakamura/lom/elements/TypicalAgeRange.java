@@ -12,4 +12,11 @@ public class TypicalAgeRange extends LangStringType {
   public TypicalAgeRange(JSONObject json) {
     super(json);
   }
+  
+  @Override
+  public String generateXML() {
+    if (this.getLangString().generateXML().equals(""))
+      return "";
+    return new String("<typicalAgeRange>" + this.getLangString().generateXML() + "</typicalAgeRange>");
+  }
 }

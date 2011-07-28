@@ -49,4 +49,16 @@ public class Relation extends Serialize {
   public void setResource(Resource resource) {
     this.resource = resource;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getKind() != null)
+      sb.append(this.getKind().generateXML());
+    if (this.getResource() != null)
+      sb.append(this.getResource().generateXML());    
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<relation>" + sb.toString() + "</relation>");
+  }
 }

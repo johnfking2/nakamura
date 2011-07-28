@@ -11,8 +11,8 @@ import java.util.List;
 public class Contribute extends Serialize{
 
   private Role role;
-  private List<String> entity;
   private Date date; 
+  private List<Entity> entity;
   
   public static enum CONTRIBUTETYPE {LIFECYCLE, METAMETADATA};
   private CONTRIBUTETYPE type;
@@ -38,10 +38,10 @@ public class Contribute extends Serialize{
     
     String entityString = JSONUtil.getStringValue(json, entityName);
     if (entityString == null) {
-      JSONArray entityArray = JSONUtil.getJSONArray(json, entityName);
-      if (entityArray != null) {
-        for (int i = 0; i < entityArray.length(); i++) {
-          String s = entityArray.optString(i);
+      JSONArray entitysArray = JSONUtil.getJSONArray(json, entityName);
+      if (entitysArray != null) {
+        for (int i = 0; i < entitysArray.length(); i++) {
+          String s = entitysArray.optString(i);
           if (s != null) {
             addEntity(s);
           }
@@ -68,16 +68,16 @@ public class Contribute extends Serialize{
     this.role = role;
   }
 
-  public List<String> getEntity() {
+  public List<Entity> getEntity() {
     return entity;
   }
 
-  public void addEntity (String e) {
+  public void addEntity (String vcard) {
     if (entity == null)
-      entity = new ArrayList<String>();
-    entity.add(e);
+      entity = new ArrayList<Entity>();
+    entity.add(new Entity(vcard));
   }
-  public void setEntity(List<String> entity) {
+  public void setEntity(List<Entity> entity) {
     this.entity = entity;
   }
 
@@ -88,6 +88,20 @@ public class Contribute extends Serialize{
   public void setDate(Date date) {
     this.date = date;
   }
-
-
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getDate() != null)
+      sb.append(this.getDate().generateXML());
+    if (this.getEntity() != null) {
+      for (int i = 0; i < this.getEntity().size(); i++)
+        sb.append(entity.get(i).generateXML());
+    }
+    if (this.getRole() != null)
+      sb.append(this.getRole().generateXML());
+    if (sb.toString().equals(""))
+      return "";
+    return new String ("<contribute>" + sb.toString() + "</contribute>");
+  }
 }

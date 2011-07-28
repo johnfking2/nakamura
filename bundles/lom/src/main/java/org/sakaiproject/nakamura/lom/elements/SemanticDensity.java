@@ -18,5 +18,11 @@ public class SemanticDensity extends VocabularyType {
   public String[] getLOMVocabulary() {
     return vocabulary;
   }
-
+  
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<semanticDensity>" + super.generateXML() + "</semanticDensity>");
+  }
 }

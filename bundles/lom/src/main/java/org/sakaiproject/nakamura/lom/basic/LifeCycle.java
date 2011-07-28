@@ -84,4 +84,20 @@ public class LifeCycle extends Serialize {
   public void setContribute(List<Contribute> contribute) {
     this.contribute = contribute;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getVersion() != null)
+      sb.append(this.getVersion().generateXML());
+    if (this.getStatus() != null)
+      sb.append(this.getStatus().generateXML());
+    if (this.getContribute() != null) {
+      for (int i = 0; i < this.getContribute().size(); i++)
+        sb.append(this.getContribute().get(i).generateXML());
+    }
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<lifeCycle>" + sb.toString() + "</lifeCycle>");
+  }
 }

@@ -132,4 +132,23 @@ public class MetaMetadata extends Serialize {
     this.language = language;
   }
 
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getIdentifier() != null)
+      for (int i = 0; i < this.getIdentifier().size(); i++)
+        sb.append(this.getIdentifier().get(i).generateXML());
+    if (this.getMetadataSchema() != null)
+      for (int i = 0; i < this.getMetadataSchema().size(); i++)
+        sb.append("<metadataSchema>" + this.getMetadataSchema().get(i) + "</metadataSchema>");
+    if (this.getContribute() != null)
+      for (int i = 0;i < this.getContribute().size(); i++)
+        sb.append(this.getContribute().get(i).generateXML());
+    if (this.getLanguage() != null)
+      sb.append("<language>" + this.getLanguage()+ "</language>");
+    
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<metaMetadata>" + sb.toString() + "</metaMetadata>");
+  }
 }

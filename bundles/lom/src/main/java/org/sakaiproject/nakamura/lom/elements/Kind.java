@@ -21,4 +21,10 @@ public class Kind extends VocabularyType {
     return vocabulary;
   }
 
+  @Override
+  public String generateXML() {
+    if (super.generateXML().equals(""))
+      return "";
+    return new String("<kind>" + super.generateXML() + "</kind>");
+  }
 }

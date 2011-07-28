@@ -69,4 +69,13 @@ public abstract class VocabularyType extends Serialize {
   }
   
   public abstract String[] getLOMVocabulary ();
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getSource() != null)
+      sb.append("<source>" + this.getSource() + "</source>");
+    if (this.getValue() != null)
+      sb.append("<value>" + this.getValue() + "</value>");
+    return sb.toString();
+  }
 }

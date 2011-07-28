@@ -116,4 +116,27 @@ public class Classification extends Serialize {
   public void setKeyword(List<Keyword> keyword) {
     this.keyword = keyword;
   }
+  
+  @Override
+  public String generateXML() {
+    StringBuilder sb = new StringBuilder("");
+    if (this.getTaxonPath() != null) {
+      for (int i = 0; i < this.getTaxonPath().size(); i++)
+        sb.append(this.getTaxonPath().get(i).generateXML());
+    }
+    if (this.getPurpose() != null) {
+      sb.append(this.getPurpose().generateXML());
+    }
+    if (this.getKeyword() != null) {
+      for (int i = 0; i < this.getKeyword().size(); i++)
+        sb.append(this.getKeyword().get(i).generateXML());
+    }
+    if (this.getDescription() != null) {
+      sb.append(this.getDescription().generateXML());
+    }
+    
+    if (sb.toString().equals(""))
+      return "";
+    return new String("<classification>" + sb.toString() + "</classification>");
+  }
 }
