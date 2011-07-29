@@ -24,7 +24,6 @@ import org.apache.sling.commons.json.JSONArray;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.io.JSONWriter;
 import org.apache.sling.commons.json.JSONObject;
-import org.apache.sling.commons.json.xml.XML;
 import org.osgi.service.event.EventAdmin;
 import org.sakaiproject.nakamura.api.cluster.ClusterTrackingService;
 import org.sakaiproject.nakamura.api.doc.BindingType;
@@ -248,8 +247,8 @@ public class ImportIMSCPServlet extends SlingAllMethodsServlet {
         String xmlContent = builder.toString();
         // Abandon the last character, otherwise there will be parse error in toJSONObject method
         xmlContent = xmlContent.substring(0, xmlContent.lastIndexOf('>') + 1);
-        JSONObject json = XML.toJSONObject(xmlContent);
-        manifest = new Manifest(json);
+        //JSONObject json = XML.toJSONObject(xmlContent);
+        manifest = new Manifest(xmlContent);
         manifestFlag = true;
         contentManager.writeBody(baseDir + "/" + filename, new ByteArrayInputStream(builder.toString().getBytes()));
         continue;
@@ -262,7 +261,7 @@ public class ImportIMSCPServlet extends SlingAllMethodsServlet {
         int length = 0;
         while (0 < (length = reader.read(chars))) {
           builder.append(chars, 0, length);
-        }          
+        }
         fileContent.put(entry.getName(), builder.toString());
         contentManager.writeBody(baseDir + "/" + entry.getName(), new ByteArrayInputStream(builder.toString().getBytes()));
         continue;
@@ -417,7 +416,7 @@ public class ImportIMSCPServlet extends SlingAllMethodsServlet {
             Resource res = manifest.getResources().searchResource(item.getIdentifierRef());
             if (res != null && res.getFiles() != null && fileContent.containsKey(res.getHref())) {
        //       itemID = StorageClientUtils.getInternalUuid();
-              itemID = "id" + String.valueOf(100000 + index);
+              itemID = "id" + String.valueOf(1000000 + index);
               itemJSON.put("_id", itemID);
               itemJSON.put("_title", item.getTitle());
               itemJSON.put("_order", index++);
@@ -427,7 +426,7 @@ public class ImportIMSCPServlet extends SlingAllMethodsServlet {
               itemJSON.put("_poolpath", "/p/" + poolId);
               JSONObject resourceJSON = new JSONObject();
        //       String resID = StorageClientUtils.insecureHash(res.getHref());
-              String resID = "id" + String.valueOf(200000 + index);
+              String resID = "id" + String.valueOf(2000000 + index);
               resourceJSON.put("_id", resID);
               resourceJSON.put("_path", poolId + "/" + res.getHref());
               
