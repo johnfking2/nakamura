@@ -10,8 +10,11 @@ public class Item extends HasItem {
 
   public Item() {
     super();
+    this.type = HasItem.ITEMTYPE.ITEM;
   }
+  
   public Item(JSONObject json) {
+    this.type = HasItem.ITEMTYPE.ITEM;
     this.json = json;
     super.init();
     this.init();    

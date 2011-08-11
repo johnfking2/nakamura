@@ -11,6 +11,8 @@ public class HasItem extends HasMetadata{
 
   private List<Item> items;
   private String title;
+  public static enum ITEMTYPE {ORGANIZATION, ITEM};
+  protected ITEMTYPE type;
 
   public HasItem() {
     super();
@@ -93,6 +95,9 @@ public class HasItem extends HasMetadata{
     return true;
   }
 
+  public ITEMTYPE getType() {
+    return type;
+  }
   @Override
   public String generateXML() {
     StringBuilder sb = new StringBuilder(super.generateXML());

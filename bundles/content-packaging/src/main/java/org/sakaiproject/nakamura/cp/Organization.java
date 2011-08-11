@@ -8,9 +8,11 @@ public class Organization extends HasItem {
   
   public Organization() {
     super();
+    this.type = HasItem.ITEMTYPE.ORGANIZATION;
   }
   
   public Organization(JSONObject json) {
+    this.type = HasItem.ITEMTYPE.ORGANIZATION;
     this.json = json;
     super.init();
     this.init();
