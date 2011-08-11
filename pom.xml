@@ -104,7 +104,6 @@
        <modules>
         <module>contrib/casauth</module>
         <module>contrib/mysql-jdbc</module>
-        <module>contrib/migratesparseuuid</module>
        </modules>
     </profile>
     <profile>
