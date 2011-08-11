@@ -29,11 +29,11 @@ public class ContentUUIDMigrator {
 
 	private static final Logger log = LoggerFactory.getLogger(ContentUUIDMigrator.class);
 
-	private static final String DEFAULT_ORIGINAL_FIELD = "_id";
+	private static final String DEFAULT_ORIGINAL_FIELD = "_sparseId";
 	@Property(value=DEFAULT_ORIGINAL_FIELD)
 	private static final String PROP_ORIGINAL_FIELD = "migrateuuid.original.field";
 
-	private static final String DEFAULT_DESTINATION_FIELD = "_sparseId";
+	private static final String DEFAULT_DESTINATION_FIELD = "_id";
 	@Property(value=DEFAULT_DESTINATION_FIELD)
 	private static final String PROP_DESTINATION_FIELD = "migrateuuid.destination.field";
 
@@ -56,7 +56,7 @@ public class ContentUUIDMigrator {
 	public void activate(Map<String,Object> props){
 		originalField = OsgiUtil.toString(PROP_ORIGINAL_FIELD, DEFAULT_ORIGINAL_FIELD);
 		destinationField = OsgiUtil.toString(PROP_DESTINATION_FIELD, DEFAULT_DESTINATION_FIELD);
-		dryrun = OsgiUtil.toBoolean(PROP_DRYRUN, true);
+		dryrun = OsgiUtil.toBoolean(PROP_DRYRUN, false);
 		migrateUUIDs();
 	}
 
@@ -104,10 +104,10 @@ public class ContentUUIDMigrator {
 		            	content.removeProperty(originalField);
 		                cm.update(content);
 		            }
-                    log.debug("Processed {}", id);
+                    log.info("Processed {}", id);
 		        }
 		        start += resultDocs.size();
-                log.debug("Processed {} of {}.", start, totalResults);
+                log.info("Processed {} of {}.", start, totalResults);
 		    }
 			session.logout();
 
