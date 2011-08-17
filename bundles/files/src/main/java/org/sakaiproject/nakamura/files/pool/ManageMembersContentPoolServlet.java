@@ -326,20 +326,7 @@ import javax.servlet.http.HttpServletResponse;
           .get(POOLED_CONTENT_USER_MANAGER));
       String[] viewers = StorageClientUtils.nonNullStringArray((String[]) properties
           .get(POOLED_CONTENT_USER_VIEWER));
-      if (!canModify(accessControlManager, thisUser, node, request, managers, viewers)       
-          && isRequestingNonPublicOperations(request)) {
-        response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
-        return;
-      }
-
-      if (!isRequestingNonPublicOperations(request)
-          || userInTargetList(request, thisUser, managers, viewers)) {
-        session = session.getRepository().loginAdministrative();
-        releaseSession = true;
-        accessControlManager = session.getAccessControlManager();
-      }
-      ContentManager contentManager = session.getContentManager();
-
+      
       Set<String> managerSet = null;
       if ( managers == null ) {
         managerSet = Sets.newHashSet();
@@ -353,6 +340,19 @@ import javax.servlet.http.HttpServletResponse;
       } else {
         viewersSet = Sets.newHashSet(viewers);
       }
+      if (!canModify(accessControlManager, thisUser, node, request, managerSet, viewersSet)       
+          && isRequestingNonPublicOperations(request)) {
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+        return;
+      }
+
+      if (!isRequestingNonPublicOperations(request)
+          || userInTargetSet(request, thisUser, managerSet, viewersSet)) {
+        session = session.getRepository().loginAdministrative();
+        releaseSession = true;
+        accessControlManager = session.getAccessControlManager();
+      }
+      ContentManager contentManager = session.getContentManager();
 
       List<AclModification> aclModifications = Lists.newArrayList();
 
@@ -423,31 +423,31 @@ import javax.servlet.http.HttpServletResponse;
     }
   }
 
-  // does thisUser have write permissions for content or are they a member of the target list
+  // does thisUser have write permissions for content or are they a member of the target set
   // being operated on
   private boolean canModify(AccessControlManager accessControlManager,
       Authorizable thisUser, Content node, SlingHttpServletRequest request,
-      String[] managers, String[] viewers) {
+      Set<String> managerSet, Set<String> viewersSet) {
     boolean canModify = false;
     if (accessControlManager.can(thisUser, Security.ZONE_CONTENT, node.getPath(),
-        Permissions.CAN_WRITE) || userInTargetList(request, thisUser, managers, viewers)) {
+        Permissions.CAN_WRITE) || userInTargetSet(request, thisUser, managerSet, viewersSet)) {
       canModify = true;
     }
     return canModify;
   }
 
-  // is thisUser a member of the target list
+  // is thisUser a member of the target set
   @SuppressWarnings("rawtypes")
-  private boolean userInTargetList(SlingHttpServletRequest request,
-      Authorizable thisUser, String[] managers, String[] viewers) {
+  private boolean userInTargetSet(SlingHttpServletRequest request,
+      Authorizable thisUser, Set<String> managerSet, Set<String> viewersSet) {
     boolean userInTargetList = false;
     String userId = thisUser.getId();
     Map parameterMap = request.getParameterMap();
     if ((parameterMap.containsKey(":manager") || parameterMap
-        .containsKey(":manager@Delete")) && Arrays.binarySearch(managers, userId) > -1) {
+        .containsKey(":manager@Delete")) && managerSet.contains(userId)) {
       userInTargetList = true;
     } else if ((parameterMap.containsKey(":viewer") || parameterMap
-        .containsKey(":viewer@Delete")) && Arrays.binarySearch(viewers, userId) > -1) {
+        .containsKey(":viewer@Delete")) && viewersSet.contains(userId)) {
       userInTargetList = true;
     }
     return userInTargetList;
@@ -458,7 +458,7 @@ import javax.servlet.http.HttpServletResponse;
     Map parameterMap = request.getParameterMap();
     return (parameterMap.containsKey(":manager")
         || parameterMap.containsKey(":manager@Delete")
-        || parameterMap.containsKey(":viewer@Delete")); 
+        || parameterMap.containsKey(":viewer@Delete"));
   }
 
 
