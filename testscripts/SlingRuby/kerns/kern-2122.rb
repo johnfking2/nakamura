@@ -19,7 +19,7 @@ class TC_Kern2122 < Test::Unit::TestCase
     @um = UserManager.new(@s)
   end
   
-    def test_add_and_remove_viewers
+  def test_add_and_remove_viewers
     m = Time.now.to_i.to_s
 
     # Create some users
@@ -38,17 +38,16 @@ class TC_Kern2122 < Test::Unit::TestCase
     wait_for_indexer()
     find_res = @s.execute_get(@s.url_for("/var/search/pool/me/manager-all.tidy.json"))
     assert_equal("200",find_res.code,find_res.body)
-    json = JSON.parse(find_res.body)
-    #assert_equal(1, json["results"].length)
-    #assert_equal(fileBody.length ,json["results"][0]["_length"])
-    
+
     add_viewers_res = @fm.manage_members(file_id, [viewer1.name, viewer2.name], nil, nil, nil)
+    assert_equal("200",add_viewers_res.code, "manage_members add viewers POST should have succeeded")
     members_res = @fm.get_members file_id
     json = JSON.parse(members_res.body)
-    assert_equal("200",members_res.code)
+    assert_equal("200",members_res.code, "get_members GET should have succeeded")
     viewers = json["viewers"]
     assert_equal(2, viewers.length, "should be 2 viewers added by manager" )
     
+    # now have viewer1 try to remove viewer2
     @s.switch_user(viewer1)
     remove_viewer2_res = @fm.manage_members(file_id, nil, [viewer2.name], nil, nil)
     members_res = @fm.get_members file_id
@@ -57,6 +56,7 @@ class TC_Kern2122 < Test::Unit::TestCase
     viewers = json["viewers"]
     assert_equal(2, viewers.length, "should be 2 viewers because viewer1 cannot remove viewer2" )
     
+    # now have viewer1 remove themself
     # this is how to remove an item from a user's library
     remove_viewer1_res = @fm.manage_members(file_id, nil, [viewer1.name], nil, nil)
     assert_equal("200",remove_viewer1_res.code, "expected viewer1 to be able to remove themself")
@@ -70,6 +70,6 @@ class TC_Kern2122 < Test::Unit::TestCase
     assert_equal(1, viewers.length, "should be 1 viewer left because viewer1 can remove themself from viewers" )
     remaining_viewer = viewers[0]
     assert_equal(viewer2.name, remaining_viewer["userid"], "should be viewer2 remaining after removal of viewer1" )
-    end
+  end
     
 end
