@@ -25,17 +25,21 @@ import org.sakaiproject.nakamura.api.lite.ClientPoolException;
 import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
+import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
 import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.lite.content.Content;
+import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.message.AbstractMessageRoute;
 import org.sakaiproject.nakamura.api.message.LiteMessageRouter;
 import org.sakaiproject.nakamura.api.message.MessageConstants;
 import org.sakaiproject.nakamura.api.message.MessageRoute;
 import org.sakaiproject.nakamura.api.message.MessageRoutes;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
+import org.sakaiproject.nakamura.api.user.BasicUserInfoService;
 import org.sakaiproject.nakamura.util.LitePersonalUtils;
+import org.sakaiproject.nakamura.util.PathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +65,9 @@ public class LiteSmtpRouter implements LiteMessageRouter {
 
   @Reference
   private ProfileService profileService;
+
+  @Reference
+  private BasicUserInfoService basicUserInfo;
 
   @Reference
   private SlingRepository slingRepo;
@@ -111,7 +118,7 @@ public class LiteSmtpRouter implements LiteMessageRouter {
                 //  future, remove this check
                 rcptEmailAddress = au.getId();
               } else {
-                rcptEmailAddress = getEmailAddress(au);
+                rcptEmailAddress = OutgoingEmailUtils.getEmailAddress(au, session, basicUserInfo, profileService, slingRepo);
               }
 
               if (StringUtils.isBlank(rcptEmailAddress)) {
@@ -163,33 +170,5 @@ public class LiteSmtpRouter implements LiteMessageRouter {
     }
 
     return prefersSmtp;
-  }
-
-  private String getEmailAddress(Authorizable user) throws RepositoryException,
-      AccessDeniedException, StorageClientException {
-    String email = null;
-    javax.jcr.Session jcrSession = null;
-    try {
-      jcrSession = slingRepo.loginAdministrative(null);
-      String emailLocationPath = profileService.getEmailLocation();
-      String[] emailLocation = StringUtils.split(emailLocationPath, '/');
-      Map<String, Object> profile = profileService.getProfileMap(user, jcrSession);
-      for (int i = 0; i < emailLocation.length; i++) {
-        if (profile.containsKey(emailLocation[i])) {
-          if (i == emailLocation.length - 1) {
-            email = String.valueOf(profile.get(emailLocation[i]));
-          } else {
-            profile = (Map<String, Object>) profile.get(emailLocation[i]);
-          }
-        } else {
-          LOG.warn("Unable to find email address location: {}", emailLocationPath);
-        }
-      }
-      return email;
-    } finally {
-      if (jcrSession != null) {
-        jcrSession.logout();
-      }
-    }
   }
 }
