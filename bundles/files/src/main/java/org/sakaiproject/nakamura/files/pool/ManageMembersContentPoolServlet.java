@@ -37,6 +37,12 @@ import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
 import org.apache.sling.api.wrappers.ValueMapDecorator;
 import org.apache.sling.commons.json.JSONException;
+import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrServer;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
 import org.sakaiproject.nakamura.api.doc.BindingType;
 import org.sakaiproject.nakamura.api.doc.ServiceBinding;
 import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
@@ -58,6 +64,7 @@ import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
+import org.sakaiproject.nakamura.api.solr.SolrServerService;
 import org.sakaiproject.nakamura.api.user.BasicUserInfoService;
 import org.sakaiproject.nakamura.api.user.UserConstants;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
@@ -65,7 +72,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -185,6 +194,8 @@ import javax.servlet.http.HttpServletResponse;
   protected transient ProfileService profileService;
   @Reference
   protected transient BasicUserInfoService basicUserInfoService;
+  @Reference
+  protected transient SolrServerService solrSearchService;
 
   /**
    * Retrieves the list of members.
@@ -352,6 +363,7 @@ import javax.servlet.http.HttpServletResponse;
         releaseSession = true;
         accessControlManager = session.getAccessControlManager();
       }
+      List<String> managedGroups = findMyManagedGroups(thisUser);
       ContentManager contentManager = session.getContentManager();
 
       List<AclModification> aclModifications = Lists.newArrayList();
@@ -453,6 +465,32 @@ import javax.servlet.http.HttpServletResponse;
     return userInTargetList;
   }
 
+//  "resourceType:authorizable AND type:g and managers:${au}",
+//  q=(resourceType:authorizable+AND+readers:bp7742+AND+type:g)&rows=100&indent=1
+  private List<String> findMyManagedGroups(Authorizable au) {
+    String userId = au.getId();
+    List<String> managedGroups = new ArrayList<String>();
+    SolrServer solrServer = solrSearchService.getServer();
+    StringBuilder querySB = new StringBuilder("resourceType:authorizable+AND+type:g+AND+readers:")
+                           .append(userId);
+    SolrQuery solrQuery = new SolrQuery(querySB.toString());
+    solrQuery.setRows(100);
+    String groupId;
+    QueryResponse response;
+    try {
+      response = solrServer.query(solrQuery);
+      SolrDocumentList results = response.getResults();
+      for (Iterator iterator = results.iterator(); iterator.hasNext();) {
+        SolrDocument solrDocument = (SolrDocument) iterator.next();
+        groupId = (String) solrDocument.getFieldValue("id");
+        managedGroups.add(groupId);
+      }
+    } catch (SolrServerException e) {
+      LOGGER.warn(e.getMessage(), e);
+    }
+    return managedGroups;
+  }
+  
   @SuppressWarnings("rawtypes")
   private boolean isRequestingNonPublicOperations(SlingHttpServletRequest request) {
     Map parameterMap = request.getParameterMap();

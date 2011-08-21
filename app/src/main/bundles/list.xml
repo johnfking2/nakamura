@@ -249,6 +249,11 @@ KERN-1187
             <artifactId>org.apache.sling.extensions.groovy</artifactId>
             <version>1.0.0-20100823</version>
         </bundle>
+		<bundle>
+			<groupId>org.sakaiproject.nakamura</groupId>
+			<artifactId>org.sakaiproject.nakamura.mysqljdbc</artifactId>
+			<version>0.11-SNAPSHOT</version>
+		</bundle>        
     </startLevel>
 
     <startLevel level="10">
