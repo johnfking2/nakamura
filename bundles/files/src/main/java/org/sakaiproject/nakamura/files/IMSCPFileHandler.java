@@ -138,6 +138,7 @@ public class IMSCPFileHandler implements FileUploadHandler {
     if (!manifestFlag) {
       throw new ServletException("There is no manifest file in the course.", new Exception("There is no manifest file in the course."));
     }
+    contentManager.writeBody(poolId + "/" + name, contentManager.getInputStream(poolId));
     //Replace relative file path to JCR path
     for (String key : fileContent.keySet()) {
       String htmlContent = fileContent.get(key);
@@ -158,14 +159,7 @@ public class IMSCPFileHandler implements FileUploadHandler {
     Content content = contentManager.get(poolId);
     content.setProperty("sakai:custom-mimetype", "x-sakai/document");
     content.setProperty("zipname", name);
-    JSONObject zipContent = new JSONObject();
-    zipContent.put("_length", content.getProperty("_length"));
-    zipContent.put(Content.PATH_FIELD, content.getProperty(Content.PATH_FIELD) + "/" + name);
-    zipContent.put(Content.CREATED_FIELD, content.getProperty(Content.CREATED_FIELD));
-    zipContent.put(Content.LASTMODIFIED_BY_FIELD, content.getProperty(Content.LASTMODIFIED_BY_FIELD));
-    zipContent.put(Content.CREATED_BY_FIELD, content.getProperty(Content.CREATED_BY_FIELD));
-    zipContent.put("_bodyLocation", content.getProperty("_bodyLocation"));
-    content.setProperty(name, zipContent.toString());
+    
     LOGGER.debug("Creating Sakai DOC from IMS-CP at {} ",poolId);
     JSONObject pageSetJSON = manifestToPageSet(manifest, poolId, fileContent);
     Iterator<String> keys = pageSetJSON.keys();
@@ -175,7 +169,6 @@ public class IMSCPFileHandler implements FileUploadHandler {
     }
     content.removeProperty(Content.MIMETYPE_FIELD);
     contentManager.update(content);
-
     return contentManager.get(poolId);
   }
 
