@@ -50,7 +50,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Dictionary;
@@ -72,6 +71,7 @@ import javax.jms.MessageConsumer;
 import javax.jms.MessageListener;
 import javax.jms.Queue;
 import javax.jms.Session;
+import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 
 @Component(immediate = true, metatype = true)
@@ -276,31 +276,50 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
       PathNotFoundException, RepositoryException {
     MultiPartEmail email = new MultiPartEmail();
 
-    try {
-      String sender = String.valueOf(contentNode.getProperty(MessageConstants.PROP_SAKAI_FROM));
-      Authorizable user = sparseSession.getAuthorizableManager().findAuthorizable(sender);
-      String to = OutgoingEmailUtils.getEmailAddress(user, sparseSession, basicUserInfo, profileService, repository);
-
-      email.setTo(Lists.newArrayList(new InternetAddress(to, "undisclosed recipients")));
-      email.setFrom(replyAsAddress, replyAsName);
-    } catch (UnsupportedEncodingException e) {
-      LOGGER.error("Cannot send email. To: address is not valid: {}", replyAsAddress);
-    } catch (EmailException e) {
-      LOGGER.error("Cannot send email. From: address as configured is not valid: {}", replyAsAddress);
-    }
 
     Set<String> toRecipients = new HashSet<String>();
 
     toRecipients = setRecipients(recipients, sparseSession);
-    for (String r : toRecipients) {
-      try {
-        email.addBcc(convertToEmail(r, sparseSession));
-      } catch (EmailException e) {
-        throw new EmailDeliveryException("Invalid To Address [" + r
-            + "], message is being dropped :" + e.getMessage(), e);
+
+    String to = null;
+    try {
+      // set from: to the reply as address
+      email.setFrom(replyAsAddress, replyAsName);
+      email.setAuthentication("user", "pass");
+
+      if (toRecipients.size() == 1) {
+        // set to: to the rcpt if sending to just one person
+        to = convertToEmail(toRecipients.iterator().next(), sparseSession);
+
+        email.setTo(Lists.newArrayList(new InternetAddress(to)));
+      } else {
+        // set to: to 'undisclosed recipients' when sending to a group of recipients
+        // this mirrors what shows up in RFC's and most major MTAs
+        // http://www.postfix.org/postconf.5.html#undisclosed_recipients_header
+        email.addHeader("To", "undisclosed-recipients:;");
       }
+    } catch (EmailException e) {
+      LOGGER.error("Cannot send email. From: address as configured is not valid: {}", replyAsAddress);
+    } catch (AddressException e) {
+      LOGGER.error("Cannot send email. To: address is not valid: {}", to);
     }
 
+    // if we're dealing with a group of recipients, add them to bcc: to hide email
+    // addresses from the other recipients
+    if (toRecipients.size() > 1) {
+      for (String r : toRecipients) {
+        try {
+          // we don't need to copy the sender on the message
+          if (r.equals(contentNode.getProperty(MessageConstants.PROP_SAKAI_FROM))) {
+            continue;
+          }
+          email.addBcc(convertToEmail(r, sparseSession));
+        } catch (EmailException e) {
+          throw new EmailDeliveryException("Invalid To Address [" + r
+              + "], message is being dropped :" + e.getMessage(), e);
+        }
+      }
+    }
 
     if (contentNode.hasProperty(MessageConstants.PROP_SAKAI_BODY)) {
       String messageBody = (String) contentNode
