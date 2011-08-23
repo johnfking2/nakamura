@@ -61,6 +61,7 @@ import org.sakaiproject.nakamura.api.lite.accesscontrol.Permissions;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.Security;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
 import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
+import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
@@ -363,7 +364,7 @@ import javax.servlet.http.HttpServletResponse;
         releaseSession = true;
         accessControlManager = session.getAccessControlManager();
       }
-      List<String> managedGroups = findMyManagedGroups(thisUser);
+      Set<String> managedGroups = findMyManagedGroups(thisUser, authorizableManager);
       ContentManager contentManager = session.getContentManager();
 
       List<AclModification> aclModifications = Lists.newArrayList();
@@ -392,7 +393,7 @@ import javax.servlet.http.HttpServletResponse;
       }
       for (String removeViewer : StorageClientUtils.nonNullStringArray(request.getParameterValues(":viewer@Delete"))) {
         // a user can only delete themselves from the viewer list
-        if ((removeViewer.length() > 0) && viewersSet.contains(removeViewer) && removeViewer.equals(thisUser.getId())) {
+        if ((removeViewer.length() > 0) && viewersSet.contains(removeViewer) && (removeViewer.equals(thisUser.getId()) || managedGroups.contains(removeViewer))) {
           viewersSet.remove(removeViewer);
           if (!managerSet.contains(removeViewer)) {
             AclModification.removeAcl(true, Permissions.CAN_READ, removeViewer,
@@ -467,11 +468,11 @@ import javax.servlet.http.HttpServletResponse;
 
 //  "resourceType:authorizable AND type:g and managers:${au}",
 //  q=(resourceType:authorizable+AND+readers:bp7742+AND+type:g)&rows=100&indent=1
-  private List<String> findMyManagedGroups(Authorizable au) {
+  private Set<String> findMyManagedGroups(Authorizable au, AuthorizableManager authorizableManager) {
     String userId = au.getId();
-    List<String> managedGroups = new ArrayList<String>();
+    Set<String> managedGroups = Sets.newHashSet();
     SolrServer solrServer = solrSearchService.getServer();
-    StringBuilder querySB = new StringBuilder("resourceType:authorizable+AND+type:g+AND+readers:")
+    StringBuilder querySB = new StringBuilder("resourceType:authorizable AND type:g AND readers:")
                            .append(userId);
     SolrQuery solrQuery = new SolrQuery(querySB.toString());
     solrQuery.setRows(100);
@@ -483,11 +484,24 @@ import javax.servlet.http.HttpServletResponse;
       for (Iterator iterator = results.iterator(); iterator.hasNext();) {
         SolrDocument solrDocument = (SolrDocument) iterator.next();
         groupId = (String) solrDocument.getFieldValue("id");
-        managedGroups.add(groupId);
+        Group group = null; String[] managers = null; Set<String> managersSet = null;
+        try {
+          group = (Group) authorizableManager.findAuthorizable(groupId);
+          managers = (String[]) group.getProperty("rep:group-managers");
+          managersSet = Sets.newHashSet(managers);
+          if (managersSet.contains(userId)) {
+            managedGroups.add(groupId);
+          }
+        } catch (AccessDeniedException e) {
+          LOGGER.error("failed to find group" + groupId, e);
+        } catch (StorageClientException e) {
+          LOGGER.error("failed to find group" + groupId, e);
+        }
       }
     } catch (SolrServerException e) {
       LOGGER.warn(e.getMessage(), e);
     }
+    LOGGER.debug("my managed groups: " + managedGroups);
     return managedGroups;
   }
   

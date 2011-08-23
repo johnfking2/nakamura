@@ -197,6 +197,11 @@ KERN-1187
             <artifactId>org.apache.sling.commons.log</artifactId>
             <version>2.0.7-20100823</version>
         </bundle>
+		<bundle>
+			<groupId>org.sakaiproject.nakamura</groupId>
+			<artifactId>org.sakaiproject.nakamura.mysqljdbc</artifactId>
+			<version>0.11-SNAPSHOTT</version>
+		</bundle>        
     </startLevel>
     <startLevel level="5">
         <bundle>
