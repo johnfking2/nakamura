@@ -352,24 +352,14 @@ import javax.servlet.http.HttpServletResponse;
       } else {
         viewersSet = Sets.newHashSet(viewers);
       }
-<<<<<<< HEAD
       Set<String> managedGroupsSet = findMyManagedGroups(thisUser, authorizableManager);
       if (!canModify(accessControlManager, thisUser, node, request, managerSet, viewersSet, managedGroupsSet)       
-=======
-      if (!canModify(accessControlManager, thisUser, node, request, managerSet, viewersSet)       
->>>>>>> 91cd10dfbaeb2c77cb1bd083f444d93f04f841cd
           && isRequestingNonPublicOperations(request)) {
         response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
         return;
       }
-<<<<<<< HEAD
       if (!isRequestingNonPublicOperations(request)
           || userOrGroupInTargetSet(request, thisUser, managerSet, viewersSet, managedGroupsSet)) {
-=======
-
-      if (!isRequestingNonPublicOperations(request)
-          || userInTargetSet(request, thisUser, managerSet, viewersSet)) {
->>>>>>> 91cd10dfbaeb2c77cb1bd083f444d93f04f841cd
         session = session.getRepository().loginAdministrative();
         releaseSession = true;
         accessControlManager = session.getAccessControlManager();
@@ -400,7 +390,6 @@ import javax.servlet.http.HttpServletResponse;
           AclModification.addAcl(true, Permissions.CAN_READ, addViewer, aclModifications);
         }
       }
-<<<<<<< HEAD
       String[] removeViewers = StorageClientUtils.nonNullStringArray(request
           .getParameterValues(":viewer@Delete"));
       for (String removeViewer : removeViewers) {
@@ -409,11 +398,6 @@ import javax.servlet.http.HttpServletResponse;
         if (viewersSet.contains(removeViewer)
             && (removeViewer.equals(thisUser.getId()) || managedGroupsSet
                 .contains(removeViewer))) {
-=======
-      for (String removeViewer : StorageClientUtils.nonNullStringArray(request.getParameterValues(":viewer@Delete"))) {
-        // a user can only delete themselves from the viewer list
-        if ((removeViewer.length() > 0) && viewersSet.contains(removeViewer) && removeViewer.equals(thisUser.getId())) {
->>>>>>> 91cd10dfbaeb2c77cb1bd083f444d93f04f841cd
           viewersSet.remove(removeViewer);
           if (!managerSet.contains(removeViewer)) {
             AclModification.removeAcl(true, Permissions.CAN_READ, removeViewer,
@@ -460,23 +444,15 @@ import javax.servlet.http.HttpServletResponse;
   // being operated on
   private boolean canModify(AccessControlManager accessControlManager,
       Authorizable thisUser, Content node, SlingHttpServletRequest request,
-<<<<<<< HEAD
       Set<String> managerSet, Set<String> viewersSet, Set<String> managedGroupsSet) {
     boolean canModify = false;
     if (accessControlManager.can(thisUser, Security.ZONE_CONTENT, node.getPath(),
         Permissions.CAN_WRITE) || userOrGroupInTargetSet(request, thisUser, managerSet, viewersSet, managedGroupsSet)) {
-=======
-      Set<String> managerSet, Set<String> viewersSet) {
-    boolean canModify = false;
-    if (accessControlManager.can(thisUser, Security.ZONE_CONTENT, node.getPath(),
-        Permissions.CAN_WRITE) || userInTargetSet(request, thisUser, managerSet, viewersSet)) {
->>>>>>> 91cd10dfbaeb2c77cb1bd083f444d93f04f841cd
       canModify = true;
     }
     return canModify;
   }
 
-<<<<<<< HEAD
   // is thisUser a member of the target set or does a group belong
   // to the set of managed groups
   @SuppressWarnings("rawtypes")
@@ -484,18 +460,10 @@ import javax.servlet.http.HttpServletResponse;
       Authorizable thisUser, Set<String> managerSet, Set<String> viewersSet,
       Set<String> managedGroupsSet) {
     boolean userOrGroupInTargetSet = false;
-=======
-  // is thisUser a member of the target set
-  @SuppressWarnings("rawtypes")
-  private boolean userInTargetSet(SlingHttpServletRequest request,
-      Authorizable thisUser, Set<String> managerSet, Set<String> viewersSet) {
-    boolean userInTargetList = false;
->>>>>>> 91cd10dfbaeb2c77cb1bd083f444d93f04f841cd
     String userId = thisUser.getId();
     Map parameterMap = request.getParameterMap();
     if ((parameterMap.containsKey(":manager") || parameterMap
         .containsKey(":manager@Delete")) && managerSet.contains(userId)) {
-<<<<<<< HEAD
       userOrGroupInTargetSet = true;
     } else if ((parameterMap.containsKey(":viewer") || parameterMap
         .containsKey(":viewer@Delete"))) {
@@ -549,17 +517,7 @@ import javax.servlet.http.HttpServletResponse;
     LOGGER.debug("my managed groups: " + managedGroups);
     return managedGroups;
   }
-  
-=======
-      userInTargetList = true;
-    } else if ((parameterMap.containsKey(":viewer") || parameterMap
-        .containsKey(":viewer@Delete")) && viewersSet.contains(userId)) {
-      userInTargetList = true;
-    }
-    return userInTargetList;
-  }
 
->>>>>>> 91cd10dfbaeb2c77cb1bd083f444d93f04f841cd
   @SuppressWarnings("rawtypes")
   private boolean isRequestingNonPublicOperations(SlingHttpServletRequest request) {
     Map parameterMap = request.getParameterMap();
