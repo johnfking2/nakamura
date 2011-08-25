@@ -253,7 +253,7 @@ KERN-1187
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.extensions.groovy</artifactId>
             <version>1.0.0-20100823</version>
-        </bundle>    
+        </bundle>
     </startLevel>
 
     <startLevel level="10">
