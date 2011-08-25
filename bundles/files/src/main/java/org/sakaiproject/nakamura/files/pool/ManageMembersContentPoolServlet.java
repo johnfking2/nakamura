@@ -352,19 +352,18 @@ import javax.servlet.http.HttpServletResponse;
       } else {
         viewersSet = Sets.newHashSet(viewers);
       }
-      if (!canModify(accessControlManager, thisUser, node, request, managerSet, viewersSet)       
+      Set<String> managedGroupsSet = findMyManagedGroups(thisUser, authorizableManager);
+      if (!canModify(accessControlManager, thisUser, node, request, managerSet, viewersSet, managedGroupsSet)       
           && isRequestingNonPublicOperations(request)) {
         response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
         return;
       }
-
       if (!isRequestingNonPublicOperations(request)
-          || userInTargetSet(request, thisUser, managerSet, viewersSet)) {
+          || userOrGroupInTargetSet(request, thisUser, managerSet, viewersSet, managedGroupsSet)) {
         session = session.getRepository().loginAdministrative();
         releaseSession = true;
         accessControlManager = session.getAccessControlManager();
       }
-      Set<String> managedGroups = findMyManagedGroups(thisUser, authorizableManager);
       ContentManager contentManager = session.getContentManager();
 
       List<AclModification> aclModifications = Lists.newArrayList();
@@ -391,9 +390,14 @@ import javax.servlet.http.HttpServletResponse;
           AclModification.addAcl(true, Permissions.CAN_READ, addViewer, aclModifications);
         }
       }
-      for (String removeViewer : StorageClientUtils.nonNullStringArray(request.getParameterValues(":viewer@Delete"))) {
-        // a user can only delete themselves from the viewer list
-        if ((removeViewer.length() > 0) && viewersSet.contains(removeViewer) && (removeViewer.equals(thisUser.getId()) || managedGroups.contains(removeViewer))) {
+      String[] removeViewers = StorageClientUtils.nonNullStringArray(request
+          .getParameterValues(":viewer@Delete"));
+      for (String removeViewer : removeViewers) {
+        removeViewer = removeViewer.trim();
+        // a user can only remove themselves or a group they manage from the viewer list
+        if (viewersSet.contains(removeViewer)
+            && (removeViewer.equals(thisUser.getId()) || managedGroupsSet
+                .contains(removeViewer))) {
           viewersSet.remove(removeViewer);
           if (!managerSet.contains(removeViewer)) {
             AclModification.removeAcl(true, Permissions.CAN_READ, removeViewer,
@@ -440,40 +444,47 @@ import javax.servlet.http.HttpServletResponse;
   // being operated on
   private boolean canModify(AccessControlManager accessControlManager,
       Authorizable thisUser, Content node, SlingHttpServletRequest request,
-      Set<String> managerSet, Set<String> viewersSet) {
+      Set<String> managerSet, Set<String> viewersSet, Set<String> managedGroupsSet) {
     boolean canModify = false;
     if (accessControlManager.can(thisUser, Security.ZONE_CONTENT, node.getPath(),
-        Permissions.CAN_WRITE) || userInTargetSet(request, thisUser, managerSet, viewersSet)) {
+        Permissions.CAN_WRITE) || userOrGroupInTargetSet(request, thisUser, managerSet, viewersSet, managedGroupsSet)) {
       canModify = true;
     }
     return canModify;
   }
 
-  // is thisUser a member of the target set
+  // is thisUser a member of the target set or does a group belong
+  // to the set of managed groups
   @SuppressWarnings("rawtypes")
-  private boolean userInTargetSet(SlingHttpServletRequest request,
-      Authorizable thisUser, Set<String> managerSet, Set<String> viewersSet) {
-    boolean userInTargetList = false;
+  private boolean userOrGroupInTargetSet(SlingHttpServletRequest request,
+      Authorizable thisUser, Set<String> managerSet, Set<String> viewersSet,
+      Set<String> managedGroupsSet) {
+    boolean userOrGroupInTargetSet = false;
     String userId = thisUser.getId();
     Map parameterMap = request.getParameterMap();
     if ((parameterMap.containsKey(":manager") || parameterMap
         .containsKey(":manager@Delete")) && managerSet.contains(userId)) {
-      userInTargetList = true;
+      userOrGroupInTargetSet = true;
     } else if ((parameterMap.containsKey(":viewer") || parameterMap
-        .containsKey(":viewer@Delete")) && viewersSet.contains(userId)) {
-      userInTargetList = true;
+        .containsKey(":viewer@Delete"))) {
+      Set<String> managedGroupsSetIntersection = Sets.newHashSet(managedGroupsSet);
+      // one or more of the viewers is a group managed by the user
+      managedGroupsSetIntersection.retainAll(viewersSet);
+      if (viewersSet.contains(userId) || managedGroupsSetIntersection.size() > 0) {
+        userOrGroupInTargetSet = true;
+      }
     }
-    return userInTargetList;
+    return userOrGroupInTargetSet;
   }
 
-//  "resourceType:authorizable AND type:g and managers:${au}",
-//  q=(resourceType:authorizable+AND+readers:bp7742+AND+type:g)&rows=100&indent=1
-  private Set<String> findMyManagedGroups(Authorizable au, AuthorizableManager authorizableManager) {
+
+  private Set<String> findMyManagedGroups(Authorizable au,
+      AuthorizableManager authorizableManager) {
     String userId = au.getId();
     Set<String> managedGroups = Sets.newHashSet();
     SolrServer solrServer = solrSearchService.getServer();
-    StringBuilder querySB = new StringBuilder("resourceType:authorizable AND type:g AND readers:")
-                           .append(userId);
+    StringBuilder querySB = new StringBuilder(
+        "resourceType:authorizable AND type:g AND readers:").append(userId);
     SolrQuery solrQuery = new SolrQuery(querySB.toString());
     solrQuery.setRows(100);
     String groupId;
@@ -484,7 +495,9 @@ import javax.servlet.http.HttpServletResponse;
       for (Iterator iterator = results.iterator(); iterator.hasNext();) {
         SolrDocument solrDocument = (SolrDocument) iterator.next();
         groupId = (String) solrDocument.getFieldValue("id");
-        Group group = null; String[] managers = null; Set<String> managersSet = null;
+        Group group = null;
+        String[] managers = null;
+        Set<String> managersSet = null;
         try {
           group = (Group) authorizableManager.findAuthorizable(groupId);
           managers = (String[]) group.getProperty("rep:group-managers");
