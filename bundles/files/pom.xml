@@ -204,5 +204,19 @@
       <groupId>org.mockito</groupId>
       <artifactId>mockito-all</artifactId>
     </dependency>
+    <dependency>
+    	<groupId>org.sakaiproject.nakamura</groupId>
+    	<artifactId>org.sakaiproject.nakamura.lom</artifactId>
+    	<version>0.11-SNAPSHOT</version>
+    	<type>bundle</type>
+    	<scope>compile</scope>
+    </dependency>
+    <dependency>
+    	<groupId>org.sakaiproject.nakamura</groupId>
+    	<artifactId>org.sakaiproject.nakamura.content-packaging</artifactId>
+    	<version>0.11-SNAPSHOT</version>
+    	<type>bundle</type>
+    	<scope>compile</scope>
+    </dependency>
   </dependencies>
 </project>
