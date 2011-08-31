@@ -6,6 +6,7 @@ import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_RT;
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_USER_MANAGER;
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_NEEDS_PROCESSING;
+import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_CUSTOM_MIMETYPE;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -19,6 +20,7 @@ import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.request.RequestParameter;
 import org.apache.sling.api.request.RequestPathInfo;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
+import org.apache.sling.commons.json.JSONArray;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.io.JSONWriter;
 import org.apache.sling.commons.json.JSONObject;
@@ -50,6 +52,15 @@ import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.lite.jackrabbit.JackrabbitSparseUtils;
 import org.sakaiproject.nakamura.api.user.UserConstants;
+import org.sakaiproject.nakamura.files.cp.File;
+import org.sakaiproject.nakamura.files.cp.HasItem;
+import org.sakaiproject.nakamura.files.cp.Item;
+import org.sakaiproject.nakamura.files.cp.Manifest;
+import org.sakaiproject.nakamura.files.cp.Organization;
+import org.sakaiproject.nakamura.files.cp.Resource;
+import org.sakaiproject.nakamura.files.lom.Keyword;
+import org.sakaiproject.nakamura.files.lom.LOMRoot;
+import org.sakaiproject.nakamura.files.lomcp.ManifestErrorException;
 import org.sakaiproject.nakamura.util.ActivityUtils;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.sakaiproject.nakamura.util.StringUtils;
@@ -57,6 +68,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -64,8 +76,10 @@ import java.io.UnsupportedEncodingException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 import java.util.Map.Entry;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -164,7 +178,6 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
       // Loop over all the parameters
       // All the ones that are files will be stored.
       int statusCode = HttpServletResponse.SC_BAD_REQUEST;
-      boolean fileUpload = false;
       Map<String, Object> results = new HashMap<String, Object>();
       for (Entry<String, RequestParameter[]> e : request.getRequestParameterMap()
           .entrySet()) {
@@ -174,29 +187,22 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
             // Generate an ID and store it.
             if ( poolId == null ) {
               String createPoolId = generatePoolId();
-              results.put(p.getFileName(), ImmutableMap.of("poolId", (Object)createPoolId,  "item", createFile(createPoolId, null, adminSession, p, au, true).getProperties()));
+              results.put("_contentItem", ImmutableMap.of("poolId", (Object)createPoolId,  "item", createCourse(createPoolId, null, adminSession, p, request, au, true).getProperties()));
               statusCode = HttpServletResponse.SC_CREATED;
-              fileUpload = true;
             } else {
               // Add it to the map so we can output something to the UI.
-              results.put(p.getFileName(), ImmutableMap.of("poolId", (Object)poolId,  "item", createFile(poolId, alternativeStream, session, p, au, false).getProperties()));
+              results.put("_contentItem", ImmutableMap.of("poolId", (Object)poolId,  "item", createCourse(poolId, alternativeStream, session, p, request, au, false).getProperties()));
               statusCode = HttpServletResponse.SC_OK;
-              fileUpload = true;
               break;
             }
 
           }
         }
       }
-      if (!fileUpload ) {
-        // not a file upload, ok, create an item and use all the request paremeters, only if there was no poolId specified
-        if ( poolId == null ) {
-          String createPoolId = generatePoolId();
-          results.put("_contentItem",  ImmutableMap.of("poolId", (Object)createPoolId,  "item", createContentItem(createPoolId, adminSession, request, au).getProperties()));
-          statusCode = HttpServletResponse.SC_CREATED;
-        }
-      }
-
+      
+      System.out.println("==========================================================");
+      System.out.println(results.get("_contentItem"));
+      System.out.println("==========================================================");
 
       // Make sure we're outputting proper json.
       if ( statusCode == HttpServletResponse.SC_BAD_REQUEST ) {
@@ -225,6 +231,9 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
     } catch (JSONException e) {
       LOGGER.warn(e.getMessage(), e);
       throw new ServletException(e.getMessage(), e);
+    } catch (ManifestErrorException e) {
+      LOGGER.warn(e.getMessage(), e);
+      throw new ServletException(e.getMessage(), e);
     } finally {
       // Make sure we're logged out.
       try {
@@ -237,61 +246,13 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
     }
   }
 
-  private Content createContentItem(String poolId, Session session,
-      SlingHttpServletRequest request, Authorizable au) throws StorageClientException, AccessDeniedException {
-    ContentManager contentManager = session.getContentManager();
-    AccessControlManager accessControlManager = session.getAccessControlManager();
-    Map<String, Object> contentProperties = new HashMap<String, Object>();
-    contentProperties.put(SLING_RESOURCE_TYPE_PROPERTY, POOLED_CONTENT_RT);
-    contentProperties.put(POOLED_CONTENT_CREATED_FOR, au.getId());
-    contentProperties.put(POOLED_CONTENT_USER_MANAGER, new String[]{au.getId()});
-    for ( Entry<String, RequestParameter[]>   e : request.getRequestParameterMap().entrySet() ) {
-      String k = e.getKey();
-      if ( !(k.startsWith("_") || k.startsWith(":")) && !FilesConstants.RESERVED_POOL_KEYS.contains(k) ) {
-        RequestParameter[] rp = e.getValue();
-        if ( rp != null && rp.length > 0 ) {
-          if ( rp.length == 1) {
-              if ( rp[0].isFormField() ) {
-                contentProperties.put(k, rp[0].getString());
-              }
-          } else {
-            List<String> values = Lists.newArrayList();
-            for ( RequestParameter rpp : rp) {
-              if ( rpp.isFormField() ) {
-                values.add(rpp.getString());
-              }
-            }
-            if ( values.size() > 0 ) {
-              contentProperties.put(k,values.toArray(new String[values.size()]));
-            }
-          }
-        }
-      }
-    }
-    Content content = new Content(poolId,contentProperties);
-
-    contentManager.update(content);
-
-    ActivityUtils.postActivity(eventAdmin, au.getId(), poolId, "Content", "default", "pooled content", "UPDATED_CONTENT", null);
-
-    // deny anon everyting
-    // deny everyone everything
-    // grant the user everything.
-    List<AclModification> modifications = new ArrayList<AclModification>();
-    AclModification.addAcl(false, Permissions.ALL, User.ANON_USER, modifications);
-    AclModification.addAcl(false, Permissions.ALL, Group.EVERYONE, modifications);
-    AclModification.addAcl(true, Permissions.CAN_MANAGE, au.getId(), modifications);
-    accessControlManager.setAcl(Security.ZONE_CONTENT, poolId, modifications.toArray(new AclModification[modifications.size()]));
-
-    return contentManager.get(poolId);
-  }
-
-  private Content createFile(String poolId, String alternativeStream, Session session, RequestParameter value,
-      Authorizable au, boolean create) throws IOException, AccessDeniedException, StorageClientException, JSONException {
+  private Content createCourse(String poolId, String alternativeStream, Session session, RequestParameter value,
+      SlingHttpServletRequest request, Authorizable au, boolean create) throws IOException, AccessDeniedException,
+      StorageClientException, JSONException, ServletException, ManifestErrorException {
     // Get the content type.
     String contentType = getContentType(value);
     if (!"application/zip".equalsIgnoreCase(contentType)) {
-      // TODO: add handle error
+      throw new ServletException("The imported course file type isn't zip format", new Exception("The imported course file type isn't zip format"));
     }
     ContentManager contentManager = session.getContentManager();
     AccessControlManager accessControlManager = session.getAccessControlManager();
@@ -299,60 +260,90 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
       // Create a proper nt:file node in jcr with some properties on it to make it possible
       // to locate this pool file without having to use the path.
       Map<String, Object> contentProperties = new HashMap<String, Object>();
-      contentProperties.put(POOLED_CONTENT_FILENAME, value.getFileName());
+   //   contentProperties.put(POOLED_CONTENT_FILENAME, value.getFileName());
       contentProperties.put(SLING_RESOURCE_TYPE_PROPERTY, POOLED_CONTENT_RT);
       contentProperties.put(POOLED_CONTENT_CREATED_FOR, au.getId());
-      contentProperties.put(POOLED_NEEDS_PROCESSING, "true");
-      contentProperties.put(Content.MIMETYPE_FIELD, contentType);
+   //   contentProperties.put(POOLED_NEEDS_PROCESSING, "true");
+   //   contentProperties.put(Content.MIMETYPE_FIELD, contentType);
       contentProperties.put(POOLED_CONTENT_USER_MANAGER, new String[]{au.getId()});
-      
-      
+      contentProperties.put(POOLED_CONTENT_CUSTOM_MIMETYPE, "x-sakai/document");
       Content content = new Content(poolId,contentProperties);
-      
       contentManager.update(content);
+      content = contentManager.get(poolId);
       
       final ZipInputStream zin = new ZipInputStream(value.getInputStream());
       ZipEntry entry;
       String baseDir = poolId;
-      String filename = "imsmanifest";
-      boolean flag = false; //to record whether there is manifest.xml.
+      String filename = "imsmanifest.xml";
+      //To record whether there is manifest.xml.
+      boolean flag = false; 
+      HashMap<String, String> fileContent = new HashMap<String, String>();
+      Manifest manifest = new Manifest();
       while ((entry = zin.getNextEntry()) != null) {
-        final long size = entry.getSize();
         if (filename.equalsIgnoreCase(entry.getName())) {
           BufferedReader reader = new BufferedReader(new InputStreamReader(new InputStream () {
-            long fileSize = size;
             public int read() {
-              fileSize --;
-              if (fileSize <= 0)
-                return -1;
               try {
                 return zin.read();
               } catch (IOException e) {
+                LOGGER.warn(e.getMessage(), e);
                 return -1;
               }
             }
           }));
+          StringBuilder builder = new StringBuilder();
+          char[] chars = new char[40960];
+          int length = 0;
+          while (0 < (length = reader.read(chars))) {
+            if (length < 40960)
+              length--;
+            builder.append(chars, 0, length);
+          }
           
+          JSONObject json = XML.toJSONObject(builder.toString());
+          manifest = new Manifest(json, "", "imsmd:");
+          try {
+            String courseName = manifest.getMetadata().getLom().getGeneral().getTitle().getLangString().getString();
+            content.setProperty(POOLED_CONTENT_FILENAME, courseName);
+          } catch (Exception e) { }
+          if (!contentProperties.containsKey(POOLED_CONTENT_FILENAME)) {
+            contentProperties.put(POOLED_CONTENT_FILENAME, value.getFileName().substring(0, value.getFileName().lastIndexOf('.')));
+          }
+          flag = true;
+          LOGGER.info("imsmanifest file excuted" + baseDir + "/" + filename);
+          contentManager.writeBody(baseDir + "/" + filename, new ByteArrayInputStream(builder.toString().getBytes()));
+          
+          continue;
+        }
+        String entryType = getServletContext().getMimeType(entry.getName());
+        if (entryType != null && entryType.contains("text")) {
+          BufferedReader reader = new BufferedReader(new InputStreamReader(new InputStream () {
+            public int read() {
+              try {
+                return zin.read();
+              } catch (IOException e) {
+                LOGGER.warn(e.getMessage(), e);
+                return -1;
+              }
+            }
+          }));
           StringBuilder builder = new StringBuilder();
           char[] chars = new char[4096];
           int length = 0;
           while (0 < (length = reader.read(chars))) {
-              builder.append(chars, 0, length);
+            builder.append(chars, 0, length);
           }
-          JSONObject json = XML.toJSONObject(builder.toString());
-          content.setProperty(IMS_CONTENT_PACKAGING, json.toString());
-          flag = true;
+          fileContent.put(entry.getName(), builder.toString());
+       //   contentManager.writeBody(baseDir + "/" + entry.getName(), new ByteArrayInputStream(builder.toString().getBytes()));
+          continue;
         }
-        
+        LOGGER.info("file excuted" + baseDir + "/" + entry.getName());
         contentManager.writeBody(baseDir + "/" + entry.getName(), new InputStream() {
-          long fileSize = size;
           public int read() {
-            fileSize --;
-            if (fileSize <= 0)
-              return -1;
             try {
               return zin.read();
             } catch (IOException e) {
+              LOGGER.warn(e.getMessage(), e);
               return -1;
             }
           }
@@ -362,9 +353,20 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
       zin.closeEntry();
       zin.close();
       if (!flag) {
-        // TODO hanle error
+        throw new ServletException("There is no manifest file in the course.", new Exception("There is no manifest file in the course."));
+      }
+      
+      JSONObject pageSetJSON = manifestToPageSet(manifest, poolId, fileContent);
+      
+      Iterator<String> keys = pageSetJSON.keys();
+      while (keys.hasNext()) {
+        String key = keys.next();
+        content.setProperty(key, pageSetJSON.optString(key));
       }
       contentManager.update(content);
+
+      ActivityUtils.postActivity(eventAdmin, au.getId(), poolId, "Content", "default", "pooled content", "UPDATED_CONTENT", null);
+
       // deny anon everyting
       // deny everyone everything
       // grant the user everything.
@@ -373,8 +375,6 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
       AclModification.addAcl(false, Permissions.ALL, Group.EVERYONE, modifications);
       AclModification.addAcl(true, Permissions.CAN_MANAGE, au.getId(), modifications);
       accessControlManager.setAcl(Security.ZONE_CONTENT, poolId, modifications.toArray(new AclModification[modifications.size()]));
-
-      ActivityUtils.postActivity(eventAdmin, au.getId(), poolId, "Content", "default", "pooled content", "CREATED_FILE", null);
     } else if (alternativeStream != null && alternativeStream.indexOf("-") > 0) {
       String[] alternativeStreamParts = StringUtils.split(alternativeStream, ALTERNATIVE_STREAM_SELECTOR_SEPARATOR);
       String pageId = alternativeStreamParts[0];
@@ -394,7 +394,7 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
     return contentManager.get(poolId);
   }
 
-  /**
+  /** 
    * Get the content type of a file that's in a {@link RequestParameter}.
    *
    * @param value
@@ -419,10 +419,105 @@ public class IMSCPImportServlet extends SlingAllMethodsServlet {
     return contentType;
   }
 
-
-
   private String generatePoolId() throws UnsupportedEncodingException,
       NoSuchAlgorithmException {
     return clusterTrackingService.getClusterUniqueId();
+  }
+  
+  private JSONObject manifestToPageSet(Manifest manifest, String poolId, HashMap<String, String> fileContent) throws JSONException {
+    JSONObject pages = new JSONObject();
+    List<Organization> orgs = manifest.getOrganizations().getOrganizations();
+    int index = 0;
+    String description = "";
+    JSONArray keywords = new JSONArray();
+    JSONArray allResources = new JSONArray();
+    try {
+      description = manifest.getMetadata().getLom().getGeneral().getDescription().get(0).getLangString().getString();
+      List<Keyword> keys = manifest.getMetadata().getLom().getGeneral().getKeyword();
+      if (keys != null) {
+        for (Keyword key : keys)
+          keywords.put(key.getLangString().getString());
+      }
+    } catch (Exception e) { }
+    pages.put("sakai:description", description);
+    if (keywords.length() != 0)
+      pages.put("sakai:tags", keywords);
+    if (orgs != null && orgs.size() != 0) {
+      for (int i = 0; i < orgs.size(); i++) {
+        Vector<Item> items = getLeafItems(orgs.get(i));
+        JSONObject orgJSON = new JSONObject();
+        JSONObject itemJSON = new JSONObject();
+        String itemID = "";
+        for (int j = 0; j < items.size(); j++) {
+          itemJSON = new JSONObject();
+          Item item = items.get(j);
+          if (item != null) {
+            Resource res = manifest.getResources().searchResource(item.getIdentifierRef());
+            if (res != null && res.getFiles() != null && fileContent.containsKey(res.getHref())) {
+       //       itemID = StorageClientUtils.getInternalUuid();
+              itemID = "id" + String.valueOf(100000 + index);
+              itemJSON.put("_id", itemID);
+              itemJSON.put("_title", item.getTitle());
+              itemJSON.put("_order", index++);
+              itemJSON.put("_canEdit", false);
+              itemJSON.put("_canSubedit", false);
+              itemJSON.put("_poolpath", "/p/" + poolId);
+              JSONObject resourceJSON = new JSONObject();
+       //       String resID = StorageClientUtils.insecureHash(res.getHref());
+              String resID = "id" + String.valueOf(200000 + index);
+              resourceJSON.put("_id", resID);
+              resourceJSON.put("_path", poolId + "/" + res.getHref());
+              
+              String contentType = getServletContext().getMimeType(res.getHref());
+              if (contentType == null)
+                contentType = "application/octet-stream";
+              resourceJSON.put("_mimeType", contentType);
+              JSONArray fileArray = new JSONArray();
+              for (int k = 0; k < res.getFiles().size(); k++) {
+                File f = res.getFiles().get(k);
+                fileArray.put(k, poolId + "/" + f.getHref());
+              }
+              resourceJSON.put("_dependencyPaths", fileArray);
+              resourceJSON.put("page", fileContent.get(res.getHref()));
+            //  pages.put("res" + resID, resourceJSON);
+              itemJSON.put("_ref", resID);
+             // JSONObject resource = new JSONObject();
+             // resource.put(resID, resourceJSON);
+              allResources.put(resourceJSON);
+              JSONObject mainObject = new JSONObject(itemJSON, new String[] {"_title", "_ref", "_canEdit", "_canSubedit", "_poolpath"});
+              mainObject.put("_order", 0);
+              mainObject.put("_id", "main");
+              mainObject.put("_elements", new JSONArray());
+              if (index > 1) {
+                mainObject.put("_childCount", 0);
+                itemJSON.put("_childCount", 1);
+              }
+              itemJSON.put("main", mainObject);
+              JSONArray elementsArray = new JSONArray();
+              elementsArray.put(mainObject);
+              itemJSON.put("_elements", elementsArray);
+              if (!"".equals(itemID))
+                orgJSON.put(itemID, itemJSON);
+            }
+          }
+        }
+        pages.put("structure" + i, orgJSON);
+      }
+      pages.put("resources", allResources);
+    }
+    return pages; 
+  }
+  
+  private static Vector<Item> getLeafItems(HasItem org) {
+    Vector<Item> result = new Vector<Item>();
+    
+    for (Item item : org.getItems()) {
+      if (item.hasSubItems()) {
+        result.addAll(getLeafItems(item));
+      } else {
+        result.add(item);
+      }
+    }
+    return result;
   }
 }
