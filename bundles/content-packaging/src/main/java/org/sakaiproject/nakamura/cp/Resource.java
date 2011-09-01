@@ -33,10 +33,12 @@ public class Resource extends HasMetadata {
     JSONObject fileJSON = JSONUtil.getJSONObject(json, fileName);
     if (fileJSON == null) {
       JSONArray fileArray = JSONUtil.getJSONArray(json, fileName);
-      for (int i = 0; i < fileArray.length(); i++) {
-        JSONObject object = fileArray.optJSONObject(i);
-        if (object != null)
-          addFile(new File(object));
+      if (fileArray != null) {
+        for (int i = 0; i < fileArray.length(); i++) {
+          JSONObject object = fileArray.optJSONObject(i);
+          if (object != null)
+            addFile(new File(object));
+        }
       }
     } else {
       addFile(new File(fileJSON));

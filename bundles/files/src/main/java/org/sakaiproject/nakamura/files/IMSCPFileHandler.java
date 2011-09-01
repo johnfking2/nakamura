@@ -158,6 +158,15 @@ public class IMSCPFileHandler implements FileUploadHandler {
     Content content = contentManager.get(poolId);
     content.setProperty("sakai:custom-mimetype", "x-sakai/document");
     content.setProperty("zipname", name);
+    JSONObject zipContent = new JSONObject();
+    zipContent.put("_length", content.getProperty("_length"));
+    zipContent.put(Content.PATH_FIELD, content.getProperty(Content.PATH_FIELD) + "/" + name);
+    zipContent.put(Content.CREATED_FIELD, content.getProperty(Content.CREATED_FIELD));
+    zipContent.put(Content.LASTMODIFIED_BY_FIELD, content.getProperty(Content.LASTMODIFIED_BY_FIELD));
+    zipContent.put(Content.CREATED_BY_FIELD, content.getProperty(Content.CREATED_BY_FIELD));
+    zipContent.put("_bodyLocation", content.getProperty("_bodyLocation"));
+    content.setProperty(name, zipContent.toString());
+    LOGGER.debug("Creating Sakai DOC from IMS-CP at {} ",poolId);
     JSONObject pageSetJSON = manifestToPageSet(manifest, poolId, fileContent);
     Iterator<String> keys = pageSetJSON.keys();
     while (keys.hasNext()) {
@@ -333,11 +342,13 @@ public class IMSCPFileHandler implements FileUploadHandler {
       contentType = "application/octet-stream";
     resourceJSON.put("_mimeType", contentType);
     JSONArray fileArray = new JSONArray();
-    for (int k = 0; k < res.getFiles().size(); k++) {
-      File f = res.getFiles().get(k);
-      fileArray.put(k, poolId + "/" + f.getHref());
+    if (res.getFiles() != null) {
+      for (int k = 0; k < res.getFiles().size(); k++) {
+        File f = res.getFiles().get(k);
+        fileArray.put(k, poolId + "/" + f.getHref());
+      }
+      resourceJSON.put("_dependencyPaths", fileArray);
     }
-    resourceJSON.put("_dependencyPaths", fileArray);
     resourceJSON.put("page", fileContent.get(res.getHref()));
     return resourceJSON;
   }
