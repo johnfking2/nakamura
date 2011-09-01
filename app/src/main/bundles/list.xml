@@ -580,7 +580,17 @@ KERN-1187
     </bundle>
     <bundle>
       <groupId>org.sakaiproject.nakamura</groupId>
-      <artifactId>org.sakaiproject.nakamura.search</artifactId>
+      <artifactId>org.sakaiproject.nakamura.files</artifactId>
+      <version>0.11-SNAPSHOT</version>
+    </bundle>
+	<bundle>
+      <groupId>org.sakaiproject.nakamura</groupId>
+      <artifactId>org.sakaiproject.nakamura.content-packaging</artifactId>
+      <version>0.11-SNAPSHOT</version>
+    </bundle>
+    <bundle>
+      <groupId>org.sakaiproject.nakamura</groupId>
+      <artifactId>org.sakaiproject.nakamura.lom</artifactId>
       <version>0.11-SNAPSHOT</version>
     </bundle>
 <!--
