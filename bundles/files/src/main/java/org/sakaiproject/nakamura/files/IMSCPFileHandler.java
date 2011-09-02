@@ -68,7 +68,7 @@ public class IMSCPFileHandler implements FileUploadHandler {
       Session adminSession = sparseRepository.loginAdministrative();
       ContentManager contentManager = adminSession.getContentManager();
       String type = (String)contentManager.get(poolId).getProperty(Content.MIMETYPE_FIELD);
-      if (!"application/zip".equals(type))
+      if (!"application/zip".equals(type) && !"application/x-zip".equals(type))
         return;
       String name = (String)contentManager.get(poolId).getProperty(POOLED_CONTENT_FILENAME);
       Content content = createCourse(poolId, adminSession, fileInputStream, name, userId);
