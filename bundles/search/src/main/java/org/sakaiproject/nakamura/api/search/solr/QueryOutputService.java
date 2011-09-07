@@ -32,7 +32,7 @@ public interface QueryOutputService {
   /**
    * Common entry point for writing out the body of the form as well as handle querying,
    * re-indexing or showing help.
-   * 
+   *
    * @param request
    * @param w
    * @param formAction
@@ -46,14 +46,14 @@ public interface QueryOutputService {
 
   /**
    * Get the count of total solr documents in the index.
-   * 
+   *
    * @return
    */
   long getSolrDocCount();
 
   /**
    * Collect options from the request into a map skipping over any
-   * 
+   *
    * @param req
    * @param solrQuery
    * @return

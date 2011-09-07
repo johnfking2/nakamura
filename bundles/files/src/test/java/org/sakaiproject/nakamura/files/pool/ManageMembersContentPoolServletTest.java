@@ -104,10 +104,10 @@ public class ManageMembersContentPoolServletTest {
   @Mock
   private ProfileService profileService;
   @Mock
-  private SolrServerService solrSearchService;  
+  private SolrServerService solrSearchService;
   @Mock
   private SolrServer solrServer;
-  @Mock  
+  @Mock
   QueryResponse queryResponse;
   @Mock
   SolrQuery query;

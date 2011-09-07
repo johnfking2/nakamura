@@ -262,7 +262,7 @@ public class QueryOutputServiceImpl implements QueryOutputService {
     SolrServer server = solrServerService.getServer();
 
     SolrQuery q = new SolrQuery(req.getParameter("q"));
-    
+
     collectOptions(req, q);
 
     queryResponse = server.query(q);
@@ -372,7 +372,7 @@ public class QueryOutputServiceImpl implements QueryOutputService {
   /**
    * Triggers indexing of all authorizables. Returns immediately without waiting for
    * indexing.
-   * 
+   *
    * @throws AccessDeniedException
    * @throws StorageClientException
    */
@@ -393,7 +393,7 @@ public class QueryOutputServiceImpl implements QueryOutputService {
 
   /**
    * Triggers indexing of all content. Returns immediately without waiting for indexing.
-   * 
+   *
    * @throws AccessDeniedException
    * @throws StorageClientException
    */

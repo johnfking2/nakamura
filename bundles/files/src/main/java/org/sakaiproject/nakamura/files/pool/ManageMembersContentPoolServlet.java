@@ -338,7 +338,7 @@ import javax.servlet.http.HttpServletResponse;
           .get(POOLED_CONTENT_USER_MANAGER));
       String[] viewers = StorageClientUtils.nonNullStringArray((String[]) properties
           .get(POOLED_CONTENT_USER_VIEWER));
-      
+
       Set<String> managerSet = null;
       if ( managers == null ) {
         managerSet = Sets.newHashSet();
@@ -353,7 +353,7 @@ import javax.servlet.http.HttpServletResponse;
         viewersSet = Sets.newHashSet(viewers);
       }
       Set<String> managedGroupsSet = findMyManagedGroups(thisUser, authorizableManager);
-      if (!canModify(accessControlManager, thisUser, node, request, managerSet, viewersSet, managedGroupsSet)       
+      if (!canModify(accessControlManager, thisUser, node, request, managerSet, viewersSet, managedGroupsSet)
           && isRequestingNonPublicOperations(request)) {
         response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
         return;
@@ -505,7 +505,7 @@ import javax.servlet.http.HttpServletResponse;
     if (LOGGER.isDebugEnabled()) LOGGER.debug("my managed groups: " + managedGroups);
     return managedGroups;
   }
-  
+
   @SuppressWarnings("rawtypes")
   private boolean isRequestingNonPublicOperations(SlingHttpServletRequest request) {
     Map parameterMap = request.getParameterMap();

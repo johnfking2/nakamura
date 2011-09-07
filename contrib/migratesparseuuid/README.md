@@ -1,6 +1,6 @@
 This migration iterates over all of the sakai content items and renames the a property to another property.
 
-Migration is performed by configuring ContentUUIDMigrator, with the old ID field and enabling the ContenMigrationComponent 
+Migration is performed by configuring ContentUUIDMigrator, with the old ID field and enabling the ContenMigrationComponent
 from the SparseMapBundle, this bundle will not do anything until its used by the ContentMigrationComponent.
 
 
