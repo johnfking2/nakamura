@@ -68,7 +68,7 @@ public class IMSCPFileHandler implements FileUploadHandler {
 
   private static final String[] DEFAULT_ZIP_TYPES = {"application/zip", "application/x-zip", "application/x-zip-compressed", "application/x-compress", "application/x-compressed" };
 
-  @Property( value = {"application/zip", "application/x-zip-compressed" } )
+  @Property( )
   private static final String ZIP_TYPES_PROP = "zip-types";
 
   private Set<String> zipTypes = ImmutableSet.of(DEFAULT_ZIP_TYPES);
@@ -380,7 +380,7 @@ public class IMSCPFileHandler implements FileUploadHandler {
    */
   private List<HasItem> getLeafItems(HasItem org) {
     List<HasItem> result = new Vector<HasItem>();
-  /*  if (!org.hasSubItems())
+/*    if (!org.hasSubItems())
       return null;
     boolean flag = false;
     for (Item item : org.getItems())
