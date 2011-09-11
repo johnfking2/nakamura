@@ -360,7 +360,6 @@ public class IMSCPFileHandler implements FileUploadHandler {
     }
     JSONObject mainObject = new JSONObject(itemJSON,
         new String[] {"_title", "_ref", "_canEdit", "_canSubedit", "_nonEditable", "_poolpath"});
-    mainObject.put("_order", 0);
     mainObject.put("_id", "_main");
     mainObject.put("_elements", new JSONArray());
     itemJSON.put("main", mainObject);
