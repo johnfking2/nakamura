@@ -25,6 +25,11 @@ import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 public class GroupMembersCounter {
   static final String PSEUDOGROUP = "sakai:pseudoGroup";
 
@@ -43,15 +48,31 @@ public class GroupMembersCounter {
   }
 
   private int countMembers(String[] members, AuthorizableManager authMgr) {
+    return countMembers(members, authMgr, new HashSet<String>());
+  }
+  
+  
+  private int countMembers(String[] members, AuthorizableManager authMgr,
+      Set<String> groupsAlreadyProcessed) {
     int count = 0;
     for (String member : members) {
+      LOGGER.debug("Checking member: " + member);
       try {
         Authorizable auth = authMgr.findAuthorizable(member);
+        // only count the members in a pseudogroup; not the group itself
         if (auth instanceof Group && "true".equals(auth.getProperty(PSEUDOGROUP))) {
-          // only count the members in a pseudogroup; not the group itself
-          count += countMembers(((Group) auth).getMembers(), authMgr);
+          Group group = (Group) auth;
+          LOGGER.debug("Processing pseudoGroup: " + group.getId());
+          if (!groupsAlreadyProcessed.contains(group.getId())) {
+            LOGGER.debug("pseudoGroup: " + group.getId() + "not already processed, counting..");
+            groupsAlreadyProcessed.add(group.getId());
+            count += countMembers(group.getMembers(), authMgr, groupsAlreadyProcessed);
+          } else {
+            LOGGER.debug("pseudoGroup: " + group.getId() + "already processed, not counted again");
+          }
         } else {
           // users and non-pseudo groups get counted as 1
+          LOGGER.debug("Counting member: " + auth.getId());
           count++;
         }
       } catch (AccessDeniedException e) {
