@@ -17,6 +17,7 @@
  */
 package org.sakaiproject.nakamura.user.counts;
 
+import static org.sakaiproject.nakamura.api.user.UserConstants.PROP_PSEUDO_GROUP;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
@@ -29,7 +30,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class GroupMembersCounter {
-  static final String PSEUDOGROUP = "sakai:pseudoGroup";
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(GroupMembersCountChangeListener.class);
@@ -58,7 +58,7 @@ public class GroupMembersCounter {
       try {
         Authorizable auth = authMgr.findAuthorizable(member);
         // only count the members in a pseudogroup; not the group itself
-        if (auth instanceof Group && "true".equals(auth.getProperty(PSEUDOGROUP))) {
+        if (auth instanceof Group && "true".equals(auth.getProperty(PROP_PSEUDO_GROUP))) {
           Group group = (Group) auth;
           LOGGER.debug("Processing pseudoGroup: " + group.getId());
           if (!groupsAlreadyProcessed.contains(group.getId())) {
