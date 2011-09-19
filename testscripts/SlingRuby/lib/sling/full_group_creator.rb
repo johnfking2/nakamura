@@ -136,7 +136,7 @@ module SlingUsers
       @log.info("POST 8 - creating initial sakai docs Library sakai doc hash: #{library_doc_hash}, Participants sakai doc hash #{participants_doc_hash}")
       @file_log.info("POST 8 - creating initial sakai docs Library sakai doc hash: #{library_doc_hash}, Participants sakai doc hash #{participants_doc_hash}") if (@file_log)
 
-      #POST 9 - importing sakai docs content
+      #POST 9 - importing sakai docs content    
       batch_post = []
       batch_post[0] = {"url" => "/p/#{library_doc_hash}.resource", "method" => "POST", "parameters" => {":operation" => "import", ":contentType" => "json", ":replace" => "true", ":replaceProperties" => "true", \
                        ":content" => "{\"id9867543247\":{\"page\":\"<img id='widget_mylibrary_id1367865652332' class='widget_inline' style='display: block; padding: 10px; margin: 4px;' \
