@@ -12,6 +12,7 @@ import org.apache.sling.api.resource.ResourceResolver;
 import org.apache.sling.api.servlets.HtmlResponse;
 import org.apache.sling.servlets.post.Modification;
 import org.apache.sling.servlets.post.SlingPostConstants;
+import org.apache.solr.client.solrj.SolrServer;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -27,6 +28,7 @@ import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.SessionAdaptable;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
+import org.sakaiproject.nakamura.api.solr.SolrServerService;
 import org.sakaiproject.nakamura.user.lite.resource.RepositoryHelper;
 
 import java.io.IOException;
@@ -44,6 +46,12 @@ public class LiteCreateSakaiUserServletTest  {
   
   @Mock
   private ResourceResolver resourceResolver;
+  
+  @Mock
+  private SolrServerService solrSearchService;
+  
+  @Mock
+  SolrServer solrServer;
 
   private Repository repository;
   
@@ -66,7 +74,7 @@ public class LiteCreateSakaiUserServletTest  {
     Mockito.when(resourceResolver.adaptTo(javax.jcr.Session.class)).thenReturn(jcrSession);
     when(request.getRemoteUser()).thenReturn("ieb");
     when(request.getResourceResolver()).thenReturn(resourceResolver);
-
+    when(solrSearchService.getServer()).thenReturn(solrServer);
     requestTrustValidatorService = new RequestTrustValidatorService() {
 
       public RequestTrustValidator getValidator(String name) {

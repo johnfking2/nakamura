@@ -35,6 +35,8 @@ import org.apache.sling.commons.osgi.OsgiUtil;
 import org.apache.sling.jcr.base.util.AccessControlUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServer;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.response.QueryResponse;
 import org.sakaiproject.nakamura.api.doc.BindingType;
 import org.sakaiproject.nakamura.api.doc.ServiceBinding;
 import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
@@ -141,20 +143,31 @@ public class LiteUserExistsServlet extends SlingSafeMethodsServlet {
       String id = idParam.getString();
       LOGGER.debug("Checking for existence of {}", id);
       
+      // do a case insensitive search for user's name preventing user name/id's that differ only in case
+      // in authorizableManager user id and name have same values
+      // and in authorizableIndexingHandler, name is indexed as a case insensitive field with type="text"
+      // see KERN-2211
       SolrServer solrServer = solrSearchService.getServer();
-//      ["type:u", "resourceType:authorizable"],
       String queryString = "resourceType:authorizable AND type:u AND name:" + id;
       SolrQuery solrQuery = new SolrQuery(queryString);
-     
-      if (session != null) {
-          UserManager userManager = AccessControlUtil.getUserManager(session);
-          if (userManager != null) {
-              Authorizable authorizable = userManager.getAuthorizable(id);
-              if (authorizable != null) {
-                  response.setStatus(HttpServletResponse.SC_NO_CONTENT);
-              } else response.sendError(HttpServletResponse.SC_NOT_FOUND);
-          }
+      QueryResponse queryResponse;
+      long userCount = 0;
+      queryResponse = solrServer.query(solrQuery);
+      userCount = queryResponse.getResults().getNumFound();
+      if (userCount > 0) {
+        response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+      } else {
+        response.sendError(HttpServletResponse.SC_NOT_FOUND);
       }
+//      if (session != null) {
+//          UserManager userManager = AccessControlUtil.getUserManager(session);
+//          if (userManager != null) {
+//              Authorizable authorizable = userManager.getAuthorizable(id);
+//              if (authorizable != null) {
+//                  response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+//              } else response.sendError(HttpServletResponse.SC_NOT_FOUND);
+//          }
+//      }
     } catch (Exception e) {
       response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getLocalizedMessage());
       return;
