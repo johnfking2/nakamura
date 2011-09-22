@@ -22,6 +22,7 @@ import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Modified;
 import org.apache.felix.scr.annotations.Properties;
 import org.apache.felix.scr.annotations.Property;
+import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.apache.felix.scr.annotations.sling.SlingServlet;
 import org.apache.jackrabbit.api.security.user.Authorizable;
@@ -32,6 +33,8 @@ import org.apache.sling.api.request.RequestParameter;
 import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
 import org.apache.sling.commons.osgi.OsgiUtil;
 import org.apache.sling.jcr.base.util.AccessControlUtil;
+import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrServer;
 import org.sakaiproject.nakamura.api.doc.BindingType;
 import org.sakaiproject.nakamura.api.doc.ServiceBinding;
 import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
@@ -40,6 +43,7 @@ import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.api.doc.ServiceSelector;
+import org.sakaiproject.nakamura.api.solr.SolrServerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,6 +118,9 @@ public class LiteUserExistsServlet extends SlingSafeMethodsServlet {
   public static final String USER_EXISTS_DELAY_MS_PROPERTY = "user.exists.delay.ms";
   public static final long USER_EXISTS_DELAY_MS_DEFAULT = 200;
   protected long delayMs;
+  
+  @Reference
+  protected SolrServerService solrSearchService;
 
   @Override
   protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response)
@@ -133,6 +140,12 @@ public class LiteUserExistsServlet extends SlingSafeMethodsServlet {
       }
       String id = idParam.getString();
       LOGGER.debug("Checking for existence of {}", id);
+      
+      SolrServer solrServer = solrSearchService.getServer();
+//      ["type:u", "resourceType:authorizable"],
+      String queryString = "resourceType:authorizable AND type:u AND name:" + id;
+      SolrQuery solrQuery = new SolrQuery(queryString);
+     
       if (session != null) {
           UserManager userManager = AccessControlUtil.getUserManager(session);
           if (userManager != null) {
