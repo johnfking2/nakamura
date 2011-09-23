@@ -55,9 +55,9 @@ import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.resource.RequestProperty;
-import org.sakaiproject.nakamura.api.solr.SolrServerService;
 import org.sakaiproject.nakamura.api.user.LiteAuthorizablePostProcessService;
 import org.sakaiproject.nakamura.api.user.UserConstants;
+import org.sakaiproject.nakamura.api.user.UserFinder;
 import org.sakaiproject.nakamura.user.lite.resource.LiteAuthorizableResourceProvider;
 import org.sakaiproject.nakamura.user.lite.resource.LiteNameSanitizer;
 import org.sakaiproject.nakamura.util.osgi.EventUtils;
@@ -187,7 +187,7 @@ public class LiteCreateSakaiUserServlet extends LiteAbstractUserPostServlet {
    * 
    */
   @Reference
-  private transient LiteAuthorizablePostProcessService postProcessorService;
+  protected transient LiteAuthorizablePostProcessService postProcessorService;
 
   /**
      *
@@ -195,8 +195,10 @@ public class LiteCreateSakaiUserServlet extends LiteAbstractUserPostServlet {
   @Reference
   protected transient RequestTrustValidatorService requestTrustValidatorService;
   
+  
   @Reference
-  protected transient SolrServerService solrSearchService;
+  protected UserFinder userFinder;
+  
 
   /** Returns the JCR repository used by this service. */
   @SuppressWarnings(justification = "OSGi Managed", value = { "UWF_UNWRITTEN_FIELD" })
@@ -323,21 +325,7 @@ public class LiteCreateSakaiUserServlet extends LiteAbstractUserPostServlet {
       selfRegSession = getSession();
       AuthorizableManager authorizableManager = selfRegSession.getAuthorizableManager();
       try {
-        // do a case insensitive search for user's name preventing user name/id's that
-        // differ only in case
-        // in authorizableManager user id and name have same values
-        // and in authorizableIndexingHandler, name is indexed as a case insensitive field
-        // with type="text"
-        // see KERN-2211
-        SolrServer solrServer = solrSearchService.getServer();
-        String queryString = "resourceType:authorizable AND type:u AND name:"
-            + principalName;
-        SolrQuery solrQuery = new SolrQuery(queryString);
-        QueryResponse queryResponse = null;
-        long userCount = 0;
-        queryResponse = solrServer.query(solrQuery);
-        userCount = queryResponse.getResults().getNumFound();
-        if (userCount == 0) {
+        if (!userFinder.userExists(principalName)) {
           if (authorizableManager.createUser(principalName, principalName,
               digestPassword(pwd), null)) {
             log.info("User {} created", principalName);
@@ -368,7 +356,7 @@ public class LiteCreateSakaiUserServlet extends LiteAbstractUserPostServlet {
                   e.getMessage());
               return;
             }
-
+            response.setStatus(HttpServletResponse.SC_CREATED, "user " + principalName + " created");
             // Launch an OSGi event for creating a user.
             try {
               Dictionary<String, String> properties = new Hashtable<String, String>();
@@ -381,16 +369,16 @@ public class LiteCreateSakaiUserServlet extends LiteAbstractUserPostServlet {
             }
           } else {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST,
-                "Unable To create User");
+                "Unable To create User " + principalName);
           }
         } else {
-          response.setStatus(HttpServletResponse.SC_BAD_REQUEST, "User by "
+          response.setStatus(HttpServletResponse.SC_BAD_REQUEST, "User by name "
               + principalName + " already exists");
         }
-      } catch (SolrServerException e1) {
-        log.warn("Could not execute solr query for user " + principalName);
+      } catch (Exception e1) {
+        log.warn("Could not create user " + principalName, e1);
         response.setStatus(HttpServletResponse.SC_BAD_REQUEST,
-            "Could not verify no user with name " + principalName + " exists");
+            "Could not create user " + principalName + " because " + e1.getMessage());
       }
     } finally {
       ungetSession(selfRegSession);
