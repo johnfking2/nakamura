@@ -2,6 +2,7 @@ package org.sakaiproject.nakamura.user;
 
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.Service;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServer;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -15,7 +16,8 @@ import org.slf4j.LoggerFactory;
 import java.util.HashSet;
 import java.util.Set;
 
-@Component(immediate = true, metatype = true)
+@Component(immediate = true, metatype = true, label = "SolrUserFinder", description = "Find users using the Solr index")
+@Service
 public class SolrUserFinderImpl implements UserFinder {
 
   @Reference

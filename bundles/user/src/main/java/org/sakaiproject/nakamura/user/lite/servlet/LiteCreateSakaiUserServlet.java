@@ -372,7 +372,7 @@ public class LiteCreateSakaiUserServlet extends LiteAbstractUserPostServlet {
                 "Unable To create User " + principalName);
           }
         } else {
-          response.setStatus(HttpServletResponse.SC_BAD_REQUEST, "User by name "
+          response.setStatus(HttpServletResponse.SC_BAD_REQUEST, "User with name "
               + principalName + " already exists");
         }
       } catch (Exception e1) {
