@@ -71,7 +71,6 @@ public class ProfileContactsSearchResultProcessor extends ProfileNodeSearchResul
     Session session = StorageClientUtils.adaptToSession(request.getResourceResolver()
         .adaptTo(javax.jcr.Session.class));
 
-    String currUser = request.getRemoteUser();
     // write out the profile information for each result
     while (results.hasNext()) {
       Result result = results.next();

@@ -32,9 +32,14 @@ import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
 import org.sakaiproject.nakamura.api.doc.ServiceExtension;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
+import org.sakaiproject.nakamura.api.lite.Session;
+import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
+import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
+import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.profile.ProfileConstants;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
+import org.sakaiproject.nakamura.lite.storage.jdbc.ConnectionManager;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +48,6 @@ import java.io.IOException;
 
 import javax.jcr.AccessDeniedException;
 import javax.jcr.RepositoryException;
-import javax.jcr.Session;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
 
@@ -94,6 +98,9 @@ public class ProfileServlet extends SlingSafeMethodsServlet {
   @Reference
   protected ProfileService profileService;
 
+  @Reference
+  private ConnectionManager connMgr;
+  
   /**
    * {@inheritDoc}
    *
@@ -105,13 +112,20 @@ public class ProfileServlet extends SlingSafeMethodsServlet {
       throws ServletException, IOException {
     Resource resource = request.getResource();
     Content profileContent = resource.adaptTo(Content.class);
+    javax.jcr.Session jcrSession = request.getResourceResolver().adaptTo(javax.jcr.Session.class);
+    Session session = StorageClientUtils.adaptToSession(jcrSession);
+    String currUser = request.getRemoteUser();
     try {
-      ValueMap map = profileService.getProfileMap(profileContent, resource.getResourceResolver().adaptTo(Session.class));
+      ValueMap map = profileService.getProfileMap(profileContent, jcrSession);
       response.setContentType("application/json");
       response.setCharacterEncoding("UTF-8");
       ExtendedJSONWriter writer = new ExtendedJSONWriter(response.getWriter());
       writer.setTidy(isTidy(request));
       writer.valueMap(map);
+//      AuthorizableManager authMgr = session.getAuthorizableManager();
+//      String authorizableId = (String) result.getFirstValue("path");
+//      Authorizable auth = authMgr.findAuthorizable(authorizableId);
+        
     } catch (AccessDeniedException e) {
       LOGGER.warn("Failed to access profile at {}: {}", new Object[] {
           resource.getPath(), e.getMessage(), e });
