@@ -102,6 +102,7 @@ public class ServerProtectionServiceImpl implements ServerProtectionService {
     "/me.html",
     "/me",
     "/register",
+    "/s2site",
     "/search/sakai2",
     "/search"  };
   private static final String DEFAULT_UNTRUSTED_CONTENT_URL = "http://localhost:8082";
@@ -192,11 +193,11 @@ public class ServerProtectionServiceImpl implements ServerProtectionService {
   @Reference(cardinality = ReferenceCardinality.OPTIONAL_MULTIPLE, policy = ReferencePolicy.DYNAMIC, strategy = ReferenceStrategy.EVENT, bind = "bindServerProtectionValidator", unbind = "unbindServerProtectionValidator")
   private ServerProtectionValidator[] serverProtectionValidators = new ServerProtectionValidator[0];
   private Map<ServiceReference, ServerProtectionValidator> serverProtectionValidatorsStore = Maps
-      .newConcurrentHashMap();
+      .newConcurrentMap();
   @Reference(cardinality = ReferenceCardinality.OPTIONAL_MULTIPLE, policy = ReferencePolicy.DYNAMIC, strategy = ReferenceStrategy.EVENT, bind = "bindServerProtectionVeto", unbind = "unbindServerProtectionVeto")
   private ServerProtectionVeto[] serverProtectionVetos = new ServerProtectionVeto[0];
   private Map<ServiceReference, ServerProtectionVeto> serverProtectionVetosStore = Maps
-      .newConcurrentHashMap();
+      .newConcurrentMap();
 
   private BundleContext bundleContext;
   private boolean disableProtectionForDevMode;
