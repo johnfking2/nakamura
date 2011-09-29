@@ -60,9 +60,6 @@ import java.util.Iterator;
 public class ProfileContactsSearchResultProcessor extends ProfileNodeSearchResultProcessor implements SolrSearchBatchResultProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProfileContactsSearchResultProcessor.class);
 
-  @Reference
-  private ConnectionManager connMgr;
-
   public ProfileContactsSearchResultProcessor() {
     super();
   }
@@ -79,24 +76,14 @@ public class ProfileContactsSearchResultProcessor extends ProfileNodeSearchResul
         .adaptTo(javax.jcr.Session.class));
 
     String currUser = request.getRemoteUser();
-    try {
-      // write out the profile information for each result
-      while (results.hasNext()) {
-        Result result = results.next();
-        // start the object here so we can decorate with contact details
-        write.object();
-        super.writeResult(request, write, result, true);
+    // write out the profile information for each result
+    while (results.hasNext()) {
+      Result result = results.next();
+      // start the object here so we can decorate with contact details
+      write.object();
+      super.writeResult(request, write, result, true);
 
-        // add contact information if appropriate
-        String otherUser = String.valueOf(result.getFirstValue("path"));
-        connMgr.writeConnectionInfo(exWriter, session, currUser, otherUser);
-
-        write.endObject();
-      }
-    } catch (StorageClientException e) {
-      LOGGER.error(e.getMessage(), e);
-    } catch (AccessDeniedException e) {
-      LOGGER.error(e.getMessage(), e);
+      write.endObject();
     }
   }
 }
