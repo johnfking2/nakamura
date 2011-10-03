@@ -26,6 +26,7 @@ import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ValueMap;
 import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
 import org.apache.sling.commons.json.JSONException;
+import org.sakaiproject.nakamura.api.connections.ConnectionManager;
 import org.sakaiproject.nakamura.api.doc.BindingType;
 import org.sakaiproject.nakamura.api.doc.ServiceBinding;
 import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
@@ -33,13 +34,13 @@ import org.sakaiproject.nakamura.api.doc.ServiceExtension;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.api.lite.Session;
+import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
 import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.profile.ProfileConstants;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
-import org.sakaiproject.nakamura.lite.storage.jdbc.ConnectionManager;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,6 +111,8 @@ public class ProfileServlet extends SlingSafeMethodsServlet {
   @Override
   protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response)
       throws ServletException, IOException {
+    response.setContentType("application/json");
+    response.setCharacterEncoding("UTF-8");
     Resource resource = request.getResource();
     Content profileContent = resource.adaptTo(Content.class);
     javax.jcr.Session jcrSession = request.getResourceResolver().adaptTo(javax.jcr.Session.class);
@@ -117,15 +120,13 @@ public class ProfileServlet extends SlingSafeMethodsServlet {
     String currUser = request.getRemoteUser();
     try {
       ValueMap map = profileService.getProfileMap(profileContent, jcrSession);
-      response.setContentType("application/json");
-      response.setCharacterEncoding("UTF-8");
+      String profileUserId = map.get("userid", String.class);
       ExtendedJSONWriter writer = new ExtendedJSONWriter(response.getWriter());
       writer.setTidy(isTidy(request));
-      writer.valueMap(map);
-//      AuthorizableManager authMgr = session.getAuthorizableManager();
-//      String authorizableId = (String) result.getFirstValue("path");
-//      Authorizable auth = authMgr.findAuthorizable(authorizableId);
-        
+      writer.object();
+      ExtendedJSONWriter.writeValueMapInternals(writer, map);
+      connMgr.writeConnectionInfo(writer, session, currUser, profileUserId);
+      writer.endObject(); 
     } catch (AccessDeniedException e) {
       LOGGER.warn("Failed to access profile at {}: {}", new Object[] {
           resource.getPath(), e.getMessage(), e });
@@ -135,6 +136,10 @@ public class ProfileServlet extends SlingSafeMethodsServlet {
     } catch (JSONException e) {
       throw new ServletException(e.getMessage(), e);
     } catch (RepositoryException e) {
+      throw new ServletException(e.getMessage(), e);
+    } catch (org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException e) {
+      throw new ServletException(e.getMessage(), e);
+    } catch (StorageClientException e) {
       throw new ServletException(e.getMessage(), e);
     }
   }

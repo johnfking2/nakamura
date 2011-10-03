@@ -99,6 +99,12 @@
       <version>1.1-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
+        <dependency>
+      <groupId>org.sakaiproject.nakamura</groupId>
+      <artifactId>org.sakaiproject.nakamura.connections</artifactId>
+      <version>1.1-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
     <!--  OSGI  -->
     <dependency>
       <groupId>org.apache.felix</groupId>
