@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Sakai Foundation (SF) under one
  * or more contributor license agreements. See the NOTICE file
  * distributed with this work for additional information
@@ -15,24 +15,33 @@
  * KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
-package org.sakaiproject.nakamura.api.foreignprincipal;
+
+package org.sakaiproject.nakamura.api.resource.lite;
 
 /**
- *
+ * Enum of the types supported in sparsemapcontent for which the ModifyOperation will
+ * process @TypeHint declarations.
  */
-public interface ForeignPrincipal {
-  /**
-   * The Principal name (and Jackrabbit Group ID) used to indicate an authenticated
-   * Principal who lacks a matching Jackrabbit Authorizable.
-   */
-  final static String FOREIGN_PRINCIPAL_ID = "sakai:foreignPrincipal";
+public enum SparseType {
 
-  /**
-   * Dynamic principal managers are only checked if an ACE refers to a principal
-   * whose ID matches a Jackrabbit Authorizable that has this property set to "true".
-   *
-   * TODO This constant is used by the DynamicACLProvider and in other areas of the
-   * code base but is not yet centrally exposed.
-   */
-  final static String DYNAMIC_PRINCIPAL_PROPERTY = "dynamic";
+  STRING,
+  LONG,
+  DOUBLE,
+  DECIMAL,
+  DATE,
+  BOOLEAN,
+  INTEGER,
+  UNDEFINED;
+
+  public static SparseType getByName(String name) {
+    if ( name == null ) {
+      return UNDEFINED;
+    }
+    SparseType type = SparseType.valueOf(name.toUpperCase());
+    if (type != null) {
+      return type;
+    }
+    return UNDEFINED;
+  }
+
 }
