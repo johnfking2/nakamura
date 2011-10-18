@@ -49,7 +49,8 @@
         <module>bundles/server</module>
         <module>bundles/image</module>
         <module>bundles/proxy</module>
-        <module>bundles/search</module>
+        <module>bundles/search/api</module>
+        <module>bundles/search/impl</module>
         <module>bundles/discussion</module>
         <module>bundles/smtp</module>
         <module>bundles/user</module>
@@ -68,7 +69,8 @@
         <module>bundles/calendar</module>
         <module>bundles/authz</module>
         <module>bundles/basiclti</module>
-        <module>bundles/profile</module>
+        <module>bundles/profile/api</module>
+        <module>bundles/profile/impl</module>        
         <module>bundles/tika</module>
         <module>bundles/captcha</module>
         <module>bundles/pages</module>
@@ -1004,12 +1006,6 @@
         <groupId>org.apache.sling</groupId>
         <artifactId>org.apache.sling.servlets.post</artifactId>
         <version>2.1.0</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.sling</groupId>
-        <artifactId>org.apache.sling.commons.json</artifactId>
-        <version>2.0.5-20110812</version>
         <scope>provided</scope>
       </dependency>
 
