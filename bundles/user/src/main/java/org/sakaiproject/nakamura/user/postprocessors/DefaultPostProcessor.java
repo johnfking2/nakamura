@@ -161,7 +161,6 @@ import javax.jcr.nodetype.PropertyDefinition;
  */
 @Component(immediate = true, metatype = true)
 @Service(value = LiteAuthorizablePostProcessor.class)
-@Properties(value = { @Property(name = "default", value = "true") })
 public class DefaultPostProcessor implements LiteAuthorizablePostProcessor {
 
   private static final String PAGES_FOLDER = "/pages";
@@ -215,13 +214,15 @@ public class DefaultPostProcessor implements LiteAuthorizablePostProcessor {
   public static final String PARAM_ADD_TO_MANAGERS_GROUP = ":sakai:manager";
   public static final String PARAM_REMOVE_FROM_MANAGERS_GROUP = PARAM_ADD_TO_MANAGERS_GROUP
       + SlingPostConstants.SUFFIX_DELETE;
-
-  static final String VISIBILITY_PREFERENCE = "visibility.preference";
-  @Property(description = "The default access settings for the home of a new user or group.", name = VISIBILITY_PREFERENCE, value = VISIBILITY_PUBLIC, options = {
+  
+  static final String VISIBILITY_PREFERENCE_DEFAULT = VISIBILITY_PUBLIC;
+  @Property(value = VISIBILITY_PREFERENCE_DEFAULT, options = {
       @PropertyOption(name = VISIBILITY_PRIVATE, value = "The home is private."),
       @PropertyOption(name = VISIBILITY_LOGGED_IN, value = "The home is blocked to anonymous users; all logged-in users can see it."),
       @PropertyOption(name = VISIBILITY_PUBLIC, value = "The home is completely public.") })
-  static final String VISIBILITY_PREFERENCE_DEFAULT = VISIBILITY_PUBLIC;
+  static final String VISIBILITY_PREFERENCE = "visibility.preference";    
+  private String visibilityPreference;
+  
   static final String PROFILE_IMPORT_TEMPLATE = "sakai.user.profile.template.default";
   static final String PROFILE_IMPORT_TEMPLATE_DEFAULT = "{'basic':{'elements':{'firstName':{'value':'@@firstName@@'},'lastName':{'value':'@@lastName@@'},'email':{'value':'@@email@@'}},'access':'everybody'}}";
 
@@ -253,8 +254,6 @@ public class DefaultPostProcessor implements LiteAuthorizablePostProcessor {
 
   @Reference
   protected EventAdmin eventAdmin;
-
-  private String visibilityPreference;
 
 
   @Activate
