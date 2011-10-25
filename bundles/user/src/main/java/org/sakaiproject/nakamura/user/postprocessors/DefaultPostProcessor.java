@@ -161,6 +161,7 @@ import javax.jcr.nodetype.PropertyDefinition;
  */
 @Component(immediate = true, metatype = true)
 @Service(value = LiteAuthorizablePostProcessor.class)
+@Properties(value = { @Property(name = "default", value = "true") })
 public class DefaultPostProcessor implements LiteAuthorizablePostProcessor {
 
   private static final String PAGES_FOLDER = "/pages";
