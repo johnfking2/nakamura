@@ -41,7 +41,8 @@
         <module>bundles/jcr</module>
         <module>bundles/locking</module>
         <module>bundles/messaging</module>
-        <module>bundles/files</module>
+        <module>bundles/files/api</module>
+        <module>bundles/files/impl</module>
         <module>bundles/personal</module>
         <module>bundles/presence</module>
         <module>bundles/resource</module>
@@ -49,7 +50,8 @@
         <module>bundles/server</module>
         <module>bundles/image</module>
         <module>bundles/proxy</module>
-        <module>bundles/search</module>
+        <module>bundles/search/api</module>
+        <module>bundles/search/impl</module>
         <module>bundles/discussion</module>
         <module>bundles/smtp</module>
         <module>bundles/user</module>
@@ -57,19 +59,18 @@
         <module>bundles/batch</module>
         <module>bundles/activation-mail</module>
         <module>bundles/email-outgoing</module>
-        <module>bundles/commons/commons-httpclient</module>
         <module>bundles/activemq</module>
         <module>bundles/activity</module>
         <module>bundles/cluster</module>
         <module>bundles/chat</module>
         <module>bundles/doc</module>
         <module>bundles/docproxy</module>
-        <module>bundles/google-collections</module>
         <module>bundles/woodstox</module>
         <module>bundles/calendar</module>
         <module>bundles/authz</module>
         <module>bundles/basiclti</module>
-        <module>bundles/profile</module>
+        <module>bundles/profile/api</module>
+        <module>bundles/profile/impl</module>        
         <module>bundles/tika</module>
         <module>bundles/captcha</module>
         <module>bundles/pages</module>
@@ -77,24 +78,28 @@
         <module>bundles/directory</module>
         <module>bundles/templates</module>
         <module>bundles/world</module>
+        <module>bundles/webconsole-plugins/solr</module>
+        <module>bundles/upgrade</module>
+        <module>bundles/lom</module>
+        <module>bundles/content-packaging</module>
         <module>testscripts</module>
       </modules>
     </profile>
     <profile>
        <id>withContrib</id>
        <modules>
+        <module>contrib/ldap</module>
         <module>contrib/import</module>
         <module>contrib/filters</module>
         <!-- <module>contrib/mailman</module> -->
         <module>contrib/persondirectory</module>
         <module>contrib/casauth</module>
         <module>contrib/ldapauth</module>
-        <module>contrib/openssoauth</module>
-        <module>contrib/ldap</module>
+        <module>contrib/samlauth</module>
+        <module>contrib/restauth</module>
         <!-- <module>contrib/remotefiles</module> -->
         <!-- to build oracle you must download and install oracle.jar first  <module>contrib/oracle-jdbc</module> -->
         <!-- <module>contrib/sitejoin</module> -->
-        <!-- Need PrincipalProviders to make this work, was removed when simplifying Server module <module>contrib/foreignprincipal</module> -->
         <module>contrib/rootconfig</module>
         <module>contrib/robots.txt</module>
        </modules>
@@ -143,7 +148,7 @@
          <plugin>
           <groupId>org.apache.sling</groupId>
           <artifactId>maven-sling-plugin</artifactId>
-          <version>2.0.5-SNAPSHOT</version>
+          <version>2.0.6</version>
           <executions>
             <execution>
               <id>install-bundle</id>
@@ -176,6 +181,84 @@
         <module>webapps-assembly</module>
       </modules>
     </profile>
+	<profile>
+      <id>license</id>
+	  <build>
+	    <plugins>
+	      <plugin>
+	        <groupId>com.mycila.maven-license-plugin</groupId>
+	        <artifactId>maven-license-plugin</artifactId>
+	        <version>1.9.0</version>
+	        <configuration>
+	          <basedir>${basedir}</basedir>
+	          <encoding>UTF-8</encoding>
+	          <header>resources/src/main/resources/header.txt</header>
+	          <quiet>false</quiet>
+	          <failIfMissing>true</failIfMissing>
+	          <aggregate>false</aggregate>
+	          <includes>
+	            <include>**/src/**/java/org/sakaiproject/**/*.java</include>
+	            <include>**/src/**/java/**/Nakamura*.java</include>
+	            <include>**/src/**/java/**/Sakai*.java</include>
+              </includes>
+	          <excludes>
+	            <exclude>bin/**</exclude>
+	            <exclude>binary/**</exclude>
+	            <exclude>etc/**</exclude>
+	            <exclude>last-release/**</exclude>
+	            <exclude>nightly/**</exclude>
+	            <exclude>resources/**</exclude>
+	            <exclude>scripts/**</exclude>
+	            <exclude>testscripts/**</exclude>
+	            <exclude>tools/**</exclude>
+	            <exclude>webstart/**</exclude>
+	            <exclude>**/m2-target/**</exclude>
+	            <exclude>**/target/**</exclude>
+	            <!--
+	              <include>**/src/**/org/apache/**/*.java</include>
+	              <include>**/src/**/org/drools/**/*.java</include>
+	              <include>**/src/**/com/sample/**/*.java</include>
+	            -->
+                <exclude>libraries/utils/src/main/java/org/sakaiproject/nakamura/util/XmlUtils.java</exclude>
+	            <exclude>**/COMMITTERS</exclude>
+	            <exclude>**/CONTRIBUTING</exclude>
+	            <exclude>**/LICENSE</exclude>
+	            <exclude>**/NOTICE</exclude>
+	            <exclude>**/*.bat</exclude>
+	            <exclude>**/*.doc</exclude>
+	            <exclude>**/*.json</exclude>
+	            <exclude>**/*.log</exclude>
+	            <exclude>**/*.md</exclude>
+	            <exclude>**/*.patch</exclude>
+                <exclude>**/*.properties</exclude>
+	            <exclude>**/*.rdf</exclude>
+	            <exclude>**/*.sh</exclude>
+	            <exclude>**/*.txt</exclude>
+	            <exclude>**/*.textile</exclude>
+	            <exclude>**/*.xml</exclude>
+	          </excludes>
+              <properties>
+	            <holder>Sakai Foundation</holder>
+	            <holder.acronym>SF</holder.acronym>
+	            <apache.license.version>2.0</apache.license.version>
+	          </properties>
+	          <strictCheck>true</strictCheck>
+	          <useDefaultExcludes>true</useDefaultExcludes>
+	          <useDefaultMapping>true</useDefaultMapping>
+	        </configuration>
+	        <executions>
+	          <execution>
+	            <id>check-headers</id>
+                <phase>verify</phase>
+	            <goals>
+	              <goal>check</goal>
+	            </goals>
+	          </execution>
+	        </executions>
+	      </plugin>
+	    </plugins>
+	  </build>
+	</profile>
     <profile>
       <id>sakai-release</id>
       <build>
@@ -203,6 +286,13 @@
             <configuration>
               <updateReleaseInfo>true</updateReleaseInfo>
             </configuration>
+            <dependencies>
+              <dependency>
+                <groupId>org.apache.maven.wagon</groupId>
+                <artifactId>wagon-ssh</artifactId>
+                <version>2.0</version>
+              </dependency>
+            </dependencies>
           </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
@@ -216,11 +306,9 @@
               </execution>
             </executions>
           </plugin>
-<!--
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
-            <version>2.6.1</version>
             <configuration>
               <encoding>${project.build.sourceEncoding}</encoding>
             </configuration>
@@ -233,7 +321,6 @@
               </execution>
             </executions>
           </plugin>
--->
         </plugins>
       </build>
     </profile>
@@ -243,11 +330,11 @@
 <!-- ===================================================================== -->
   <mailingLists>
     <mailingList>
-      <name>Sakai Nakamura Dev List</name>
-      <subscribe>sakai-nakamura-subscribe@groups.google.com</subscribe>
-      <unsubscribe>sakai-nakamura-unsubscribe@groups.google.com</unsubscribe>
-      <post>sakai-nakamura@groups.google.com</post>
-      <archive>http://groups.google.com/sakai-nakamura/</archive>
+      <name>Sakai OAE Dev List</name>
+      <subscribe>http://collab.sakaiproject.org/mailman/listinfo/oae-dev</subscribe>
+      <unsubscribe>http://collab.sakaiproject.org/mailman/listinfo/oae-dev</unsubscribe>
+      <post>oae-dev@collab.sakaiproject.org</post>
+      <archive>http://collab.sakaiproject.org/pipermail/oae-dev/</archive>
     </mailingList>
   </mailingLists>
 <!-- ====================================================================== -->
@@ -281,7 +368,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-scm-plugin</artifactId>
-        <version>1.1</version>
+        <version>1.5</version>
         <dependencies>
           <dependency>
             <groupId>org.apache.maven.scm</groupId>
@@ -300,12 +387,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
-        <version>2.1-beta-1</version>
+        <version>2.1.1</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins </groupId>
         <artifactId>maven-eclipse-plugin</artifactId>
-        <version>2.7</version>
+        <version>2.8</version>
 <!--
           <configuration>
           <projectNameTemplate>${project.groupId}-${project.artifactId}</projectNameTemplate>
@@ -315,15 +402,15 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <version>2.1</version>
+        <version>2.3</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>2.0.2</version>
+        <version>2.3.2</version>
         <configuration>
-          <source>1.5</source>
-          <target>1.5</target>
+          <source>1.6</source>
+          <target>1.6</target>
           <showDeprecation>true</showDeprecation>
           <compilerArgument>-Xlint:unchecked,deprecation,fallthrough,finally</compilerArgument>
           <fork>true</fork>
@@ -332,6 +419,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-source-plugin</artifactId>
+        <version>2.1.2</version>
         <executions>
           <execution>
             <id>attach-sources</id>
@@ -350,51 +438,10 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>2.4.1</version>
+        <version>2.5</version>
         <configuration>
           <encoding>${project.build.sourceEncoding}</encoding>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>cobertura-maven-plugin</artifactId>
-        <version>2.5.1</version>
-        <configuration>
-          <aggregate>true</aggregate>
-          <check>
-            <haltOnFailure>false</haltOnFailure>
-            <regexes>
-              <regex>
-                <pattern>org.sakaiproject.nakamura.*</pattern>
-                <branchRate>90</branchRate>
-                <lineRate>90</lineRate>
-              </regex>
-            </regexes>
-          </check>
-          <instrumentation>
-            <includes>
-              <include>org/sakaiproject/nakamura/**/*.class</include>
-            </includes>
-          </instrumentation>
-        </configuration>
-        <executions>
-          <execution>
-            <id>clean</id>
-            <phase>pre-site</phase>
-            <goals>
-              <goal>clean</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>instrument</id>
-            <phase>site</phase>
-            <goals>
-              <goal>instrument</goal>
-              <goal>cobertura</goal>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -412,13 +459,13 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-assembly-plugin</artifactId>
-          <version>2.2-beta-2</version>
+          <version>2.2.1</version>
         </plugin>
 <!-- We want to package up license resources in the JARs produced -->
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-remote-resources-plugin</artifactId>
-          <version>1.0-alpha-6</version>
+          <version>1.2.1</version>
           <executions>
             <execution>
               <goals>
@@ -435,7 +482,7 @@
         <plugin>
           <groupId>org.apache.felix</groupId>
           <artifactId>maven-scr-plugin</artifactId>
-          <version>1.7.0</version>
+          <version>1.7.2</version>
           <dependencies>
             <dependency>
               <groupId>org.slf4j</groupId>
@@ -455,7 +502,7 @@
         <plugin>
           <groupId>org.apache.felix</groupId>
           <artifactId>maven-bundle-plugin</artifactId>
-          <version>2.0.1</version>
+          <version>2.1.0</version>
           <inherited>true</inherited>
           <configuration>
             <instructions>
@@ -479,22 +526,29 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-deploy-plugin</artifactId>
-          <version>2.4</version>
+          <version>2.7</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.wagon</groupId>
+              <artifactId>wagon-ssh</artifactId>
+              <version>2.0</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-install-plugin</artifactId>
-          <version>2.3</version>
+          <version>2.3.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-gpg-plugin</artifactId>
-          <version>1.0-alpha-4</version>
+          <version>1.4</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>2.1</version>
+          <version>2.3.2</version>
           <configuration>
             <archive>
               <manifest>
@@ -507,26 +561,33 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>2.6.1</version>
+          <version>2.8</version>
           <configuration>
-            <source>1.5</source>
-            <target>1.5</target>
+            <source>1.6</source>
+            <target>1.6</target>
           </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-site-plugin</artifactId>
-          <version>2.0.1</version>
+          <version>3.0</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.wagon</groupId>
+              <artifactId>wagon-ssh</artifactId>
+              <version>2.0</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-source-plugin</artifactId>
-          <version>2.0.4</version>
+          <version>2.1.2</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.5</version>
+          <version>2.9</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -536,7 +597,15 @@
         <plugin>
           <groupId>org.apache.sling</groupId>
           <artifactId>maven-launchpad-plugin</artifactId>
-          <version>2.0.10</version>
+          <version>2.1.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-pmd-plugin</artifactId>
+          <version>2.5</version>
+          <configuration>
+            <targetJdk>1.6</targetJdk>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -547,41 +616,54 @@
   <reporting>
     <plugins>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>findbugs-maven-plugin</artifactId>
-        <version>1.2</version>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>2.4</version>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>mailing-list</report>
+              <report>issue-tracking</report>
+              <report>scm</report>
+            </reports>
+          </reportSet>
+        </reportSets>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>2.2</version>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <version>2.5</version>
         <configuration>
-          <configLocation>site/checkstyle.xml</configLocation>
+          <targetJdk>1.6</targetJdk>
+          <linkXref>true</linkXref>
         </configuration>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>cobertura-maven-plugin</artifactId>
-        <version>2.5.1</version>
+          <version>2.5.1</version>
+          <configuration>
+            <aggregate>true</aggregate>
+          </configuration>
       </plugin>
-      <plugin>
+      <!-- <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>2.6.1</version>
+        <version>2.8</version>
         <configuration>
           <aggregate>true</aggregate>
           <links>
-            <link>http://java.sun.com/j2se/1.5.0/docs/api</link>
-            <link>http://java.sun.com/products/servlet/2.3/javadoc/</link>
+            <link>http://download.oracle.com/javase/6/docs/api/</link>
+            <link>http://download.oracle.com/javaee/5/api/</link>
             <link>http://www.json.org/javadoc/</link>
             <link>http://junit.sourceforge.net/javadoc/</link>
           </links>
         </configuration>
-      </plugin>
+      </plugin> -->
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>jxr-maven-plugin</artifactId>
-        <version>2.2</version>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jxr-plugin</artifactId>
+        <version>2.3</version>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -591,7 +673,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>taglist-maven-plugin</artifactId>
-        <version>2.3</version>
+        <version>2.4</version>
         <configuration>
           <tags>
             <tag>TODO</tag>
@@ -605,25 +687,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-report-plugin</artifactId>
         <version>2.7.1</version>
-      </plugin>
-<!--
-        <plugin> <groupId>org.codehaus.mojo</groupId> <artifactId>rat-maven-plugin</artifactId>
-        <version>1.0-alpha-3</version> <configuration> <includes> <include>**/*.java</include>
-        </includes> </configuration> </plugin>
-      -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>versions-maven-plugin</artifactId>
-        <version>1.1</version>
-        <reportSets>
-          <reportSet>
-            <reports>
-              <report>dependency-updates-report</report>
-              <report>plugin-updates-report</report>
-              <report>property-updates-report</report>
-            </reports>
-          </reportSet>
-        </reportSets>
       </plugin>
     </plugins>
   </reporting>
@@ -761,11 +824,43 @@
   </dependencies>
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>org.apache.jackrabbit</groupId>
+        <artifactId>jackrabbit-api</artifactId>
+        <version>2.1.1</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.jackrabbit</groupId>
+        <artifactId>jackrabbit-core</artifactId>
+        <version>2.1.1</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.jackrabbit</groupId>
+        <artifactId>jackrabbit-jcr-commons</artifactId>
+        <version>2.1.1</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.jackrabbit</groupId>
+        <artifactId>jackrabbit-spi-commons</artifactId>
+        <version>2.1.1</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.jackrabbit</groupId>
+        <artifactId>jackrabbit-jcr-rmi</artifactId>
+        <version>2.1.1</version>
+        <scope>provided</scope>
+      </dependency>
+
 <!-- scr annotations -->
       <dependency>
         <groupId>org.apache.felix</groupId>
         <artifactId>org.apache.felix.scr.annotations</artifactId>
-        <version>1.5.0</version>
+        <version>1.6.0</version>
+        <scope>provided</scope>
       </dependency>
 
 <!-- testing libraries -->
@@ -809,20 +904,117 @@
         <groupId>org.subethamail</groupId>
         <artifactId>subethasmtp-wiser</artifactId>
         <version>1.2</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
          <groupId>org.apache.sling</groupId>
          <artifactId>org.apache.sling.commons.testing</artifactId>
          <version>2.0.5-20100823</version>
          <scope>test</scope>
-     </dependency>
+      </dependency>
 
 <!-- Sling dependencies -->
       <dependency>
         <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.adapter</artifactId>
+        <version>2.0.6</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.api</artifactId>
+        <version>2.1.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.auth.core</artifactId>
+        <version>1.0.2</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
         <artifactId>org.apache.sling.commons.json</artifactId>
         <version>2.0.5-20110812</version>
-        <scope>compile</scope>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.commons.mime</artifactId>
+        <version>2.1.4</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.commons.osgi</artifactId>
+        <version>2.0.6</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.commons.scheduler</artifactId>
+        <version>2.3.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.engine</artifactId>
+        <version>2.1.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.fsresource</artifactId>
+        <version>1.0.1-20100823</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.jcr.api</artifactId>
+        <version>2.1.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.jcr.base</artifactId>
+        <version>2.1.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.jcr.contentloader</artifactId>
+        <version>2.1.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.jcr.jackrabbit.server</artifactId>
+        <version>2.1.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.jcr.jackrabbit.usermanager</artifactId>
+        <version>2.0.5-20100823</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.jcr.resource</artifactId>
+        <version>2.0.7-20100823</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.launchpad.base</artifactId>
+        <version>2.3.0</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.sling</groupId>
+        <artifactId>org.apache.sling.servlets.post</artifactId>
+        <version>2.1.0</version>
+        <scope>provided</scope>
       </dependency>
 
 <!-- OSGi Libraries -->
@@ -851,15 +1043,16 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.google.collections</groupId>
-        <artifactId>google-collections</artifactId>
-        <version>0.8</version>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>r09</version>
         <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>net.sf.ehcache</groupId>
         <artifactId>ehcache</artifactId>
         <version>1.5.0</version>
+        <scope>provided</scope>
       </dependency>
 
 <!-- Web Application API -->
@@ -875,7 +1068,7 @@
         <groupId>javax.jcr</groupId>
         <artifactId>jcr</artifactId>
         <version>2.0</version>
-        <scope>compile</scope>
+        <scope>provided</scope>
       </dependency>
 
 <!-- Jetty, for utilities -->
@@ -903,19 +1096,40 @@
       </dependency>
 
       <dependency>
+        <groupId>commons-httpclient</groupId>
+        <artifactId>commons-httpclient</artifactId>
+        <version>3.1</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>1.4</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
         <groupId>commons-lang</groupId>
         <artifactId>commons-lang</artifactId>
-        <version>2.4</version>
+        <version>2.5</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>commons-pool</groupId>
+        <artifactId>commons-pool</artifactId>
+        <version>1.5.5</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-email</artifactId>
         <version>1.1</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
         <version>1.4</version>
+        <scope>provided</scope>
       </dependency>
 
 <!-- Pax Web -->
@@ -925,21 +1139,21 @@
         <version>0.6.0</version>
         <scope>provided</scope>
       </dependency>
-
-      <dependency>
-        <groupId>org.apache.solr</groupId>
-        <artifactId>solr-solrj</artifactId>
-        <version>4.0.1040465</version>
-      </dependency>
       
       <!-- sparsemapcontent storage layer -->
       <dependency>
         <groupId>org.sakaiproject.nakamura</groupId>
         <artifactId>org.sakaiproject.nakamura.core</artifactId>
-        <version>1.1-20110928</version>
-        <scope>compile</scope>
+        <version>1.1-SNAPSHOT</version>
+        <scope>provided</scope>
       </dependency>
-							      
+      <dependency>
+        <groupId>org.sakaiproject.nakamura</groupId>
+        <artifactId>org.sakaiproject.nakamura.solr</artifactId>
+        <version>1.1-SNAPSHOT</version>
+        <scope>provided</scope>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 </project>

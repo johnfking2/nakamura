@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Sakai Foundation (SF) under one
  * or more contributor license agreements. See the NOTICE file
  * distributed with this work for additional information
@@ -62,12 +62,6 @@ public class MessageSparseSearchPropertyProvider implements SolrSearchPropertyPr
     final boolean solrSearchType = "sakai/solr-search".equals(resourceType);
     String fullPathToStore = ClientUtils.escapeQueryChars(messagingService
         .getFullPathToStore(user, session));
-    if (solrSearchType) {
-      if (fullPathToStore.endsWith("/")) {
-        final int lastSlashPosition = fullPathToStore.lastIndexOf("/");
-        fullPathToStore = fullPathToStore.substring(0, lastSlashPosition);
-      }
-    }
     propertiesMap.put(MessageConstants.SEARCH_PROP_MESSAGESTORE, fullPathToStore);
 
     RequestParameter address = request.getRequestParameter("address");
