@@ -17,8 +17,12 @@
  */
 package org.sakaiproject.nakamura.auth.cas;
 
+import static org.apache.sling.jcr.resource.JcrResourceConstants.AUTHENTICATION_INFO_CREDENTIALS;
+
 import com.ctc.wstx.stax.WstxInputFactory;
+
 import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.lang.StringUtils;
 import org.apache.felix.scr.annotations.Activate;
@@ -29,15 +33,31 @@ import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.apache.sling.api.auth.Authenticator;
-import org.apache.sling.auth.core.spi.AuthenticationFeedbackHandler;
 import org.apache.sling.auth.core.spi.AuthenticationHandler;
 import org.apache.sling.auth.core.spi.AuthenticationInfo;
-import org.apache.sling.auth.core.spi.DefaultAuthenticationFeedbackHandler;
 import org.apache.sling.commons.osgi.PropertiesUtil;
-import org.apache.sling.jcr.api.SlingRepository;
 import org.osgi.framework.Constants;
+import org.sakaiproject.nakamura.api.lite.Repository;
+import org.sakaiproject.nakamura.api.lite.Session;
+import org.sakaiproject.nakamura.api.lite.StorageClientException;
+import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
+import org.sakaiproject.nakamura.api.lite.content.Content;
+import org.sakaiproject.nakamura.api.lite.content.ContentManager;
+import org.sakaiproject.nakamura.util.LitePersonalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.security.Principal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import javax.jcr.SimpleCredentials;
 import javax.servlet.http.HttpServletRequest;
@@ -50,18 +70,6 @@ import javax.xml.stream.events.Attribute;
 import javax.xml.stream.events.Characters;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
-import java.io.IOException;
-import java.io.StringReader;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.security.Principal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
-import static org.apache.sling.jcr.resource.JcrResourceConstants.AUTHENTICATION_INFO_CREDENTIALS;
 
 /**
  * This class integrates SSO with the Sling authentication framework.
@@ -69,7 +77,7 @@ import static org.apache.sling.jcr.resource.JcrResourceConstants.AUTHENTICATION_
  * support in the OSGi / Sling environment.
  */
 @Component(metatype = true)
-@Service({CasAuthenticationHandler.class, AuthenticationHandler.class, AuthenticationFeedbackHandler.class})
+@Service({CasAuthenticationHandler.class, AuthenticationHandler.class})
 @Properties(value = {
     @Property(name = Constants.SERVICE_RANKING, intValue = -5),
     @Property(name = AuthenticationHandler.PATH_PROPERTY, value = "/"),
@@ -78,10 +86,10 @@ import static org.apache.sling.jcr.resource.JcrResourceConstants.AUTHENTICATION_
     @Property(name = CasAuthenticationHandler.LOGOUT_URL, value = CasAuthenticationHandler.DEFAULT_LOGOUT_URL),
     @Property(name = CasAuthenticationHandler.SERVER_URL, value = CasAuthenticationHandler.DEFAULT_SERVER_URL),
     @Property(name = CasAuthenticationHandler.RENEW, boolValue = CasAuthenticationHandler.DEFAULT_RENEW),
-    @Property(name = CasAuthenticationHandler.GATEWAY, boolValue = CasAuthenticationHandler.DEFAULT_GATEWAY)
+    @Property(name = CasAuthenticationHandler.GATEWAY, boolValue = CasAuthenticationHandler.DEFAULT_GATEWAY),
+    @Property(name = CasAuthenticationHandler.PROXY, boolValue = CasAuthenticationHandler.DEFAULT_PROXY)
 })
-public class CasAuthenticationHandler implements AuthenticationHandler,
-    AuthenticationFeedbackHandler {
+public class CasAuthenticationHandler implements AuthenticationHandler {
 
   public static final String AUTH_TYPE = "CAS";
 
@@ -94,13 +102,13 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
   static final String DEFAULT_SERVER_URL = "http://localhost/cas";
   static final boolean DEFAULT_RENEW = false;
   static final boolean DEFAULT_GATEWAY = false;
+  static final boolean DEFAULT_PROXY = false;
+
+  @Reference
+  Repository repo;
 
   /** Represents the constant for where the assertion will be located in memory. */
   static final String AUTHN_INFO = "org.sakaiproject.nakamura.auth.cas.SsoAuthnInfo";
-
-  // needed for the automatic user creation.
-  @Reference
-  protected SlingRepository repository;
 
   static final String LOGIN_URL = "sakai.auth.cas.url.login";
   private String loginUrl;
@@ -117,6 +125,14 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
   static final String GATEWAY = "sakai.auth.cas.prop.gateway";
   private boolean gateway;
 
+  static final String PROXY = "sakai.auth.cas.prop.proxy";
+  private boolean proxy;
+
+  // FIXME This will probably fail in a cluster, what if CAS calls back to a different
+  // server
+  protected static HashMap<String, String> pgtIOUs = new HashMap<String, String>();
+  protected static HashMap<String, String> pgts = new HashMap<String, String>();
+
   /**
    * Define the set of authentication-related query parameters which should
    * be removed from the "service" URL sent to the SSO server.
@@ -127,16 +143,8 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
   public CasAuthenticationHandler() {
   }
 
-  CasAuthenticationHandler(SlingRepository repository) {
-    this.repository = repository;
-  }
-
   //----------- OSGi integration ----------------------------
   @Activate
-  protected void activate(Map<?, ?> props) {
-    modified(props);
-  }
-
   @Modified
   protected void modified(Map<?, ?> props) {
     loginUrl = PropertiesUtil.toString(props.get(LOGIN_URL), DEFAULT_LOGIN_URL);
@@ -145,6 +153,7 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
 
     renew = PropertiesUtil.toBoolean(props.get(RENEW), DEFAULT_RENEW);
     gateway = PropertiesUtil.toBoolean(props.get(GATEWAY), DEFAULT_GATEWAY);
+    proxy = PropertiesUtil.toBoolean(props.get(PROXY), DEFAULT_PROXY);
   }
 
   //----------- AuthenticationHandler interface ----------------------------
@@ -169,7 +178,7 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
 
   public AuthenticationInfo extractCredentials(HttpServletRequest request,
       HttpServletResponse response) {
-    LOGGER.debug("extractCredentials called");
+    LOGGER.trace("extractCredentials called");
 
     AuthenticationInfo authnInfo = null;
 
@@ -179,7 +188,13 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
       try {
         // make REST call to validate artifact
         String service = constructServiceParameter(request);
+
         String validateUrl = serverUrl + "/serviceValidate?service=" + service + "&ticket=" + artifact;
+        if (proxy) {
+          validateUrl =  validateUrl + "&pgtUrl=https%3A%2F%2F" + request.getServerName()
+              + "%2Fsystem%2Fsling%2Fcas%2Fproxy";
+        }
+
         GetMethod get = new GetMethod(validateUrl);
         HttpClient httpClient = new HttpClient();
         int returnCode = httpClient.executeMethod(get);
@@ -198,7 +213,7 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
             authnInfo = AuthenticationInfo.FAIL_AUTH;
           }
         } else {
-          LOGGER.error("Failed response from validation server: [" + returnCode + "]");
+          LOGGER.error("Failed response from validation server: [{}]", returnCode);
           authnInfo = AuthenticationInfo.FAIL_AUTH;
         }
       } catch (Exception e) {
@@ -210,11 +225,11 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
   }
 
   /**
-   * Called after extractCredentials has returne non-null but logging into the repository
+   * Called after extractCredentials has returned non-null but logging into the repository
    * with the provided AuthenticationInfo failed.<br/>
-   *
+   * 
    * {@inheritDoc}
-   *
+   * 
    * @see org.apache.sling.auth.core.spi.AuthenticationHandler#requestCredentials(javax.servlet.http.HttpServletRequest,
    *      javax.servlet.http.HttpServletResponse)
    */
@@ -253,57 +268,6 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
 
     params.add("service=" + service);
     return loginUrl + "?" + StringUtils.join(params, '&');
-  }
-
-  //----------- AuthenticationFeedbackHandler interface ----------------------------
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.apache.sling.auth.core.spi.AuthenticationFeedbackHandler#authenticationFailed(javax.servlet.http.HttpServletRequest,
-   *      javax.servlet.http.HttpServletResponse,
-   *      org.apache.sling.auth.core.spi.AuthenticationInfo)
-   */
-  public void authenticationFailed(HttpServletRequest request,
-      HttpServletResponse response, AuthenticationInfo authInfo) {
-//    LOGGER.debug("authenticationFailed called");
-//    final HttpSession session = request.getSession(false);
-//    if (session != null) {
-//      final SsoPrincipal principal = (SsoPrincipal) session
-//          .getAttribute(CONST_SSO_ASSERTION);
-//      if (principal != null) {
-//        LOGGER.warn("SSO assertion is set", new Exception());
-//      }
-//    }
-  }
-
-  /**
-   * If a redirect is configured, this method will take care of the redirect.
-   * <p>
-   * If user auto-creation is configured, this method will check for an existing
-   * Authorizable that matches the principal. If not found, it creates a new Jackrabbit
-   * user with all properties blank except for the ID and a randomly generated password.
-   * WARNING: Currently this will not perform the extra work done by the Nakamura
-   * CreateUserServlet, and the resulting user will not be associated with a valid
-   * profile.
-   * <p>
-   * Note: do not try to inject the token here.  The request has not had the authenticated
-   * user added to it so request.getUserPrincipal() and request.getRemoteUser() both
-   * return null.
-   * <p>
-   * TODO This really needs to be dropped to allow for user pull, person directory
-   * integrations, etc. See SLING-1563 for the related issue of user population via
-   * OpenID.
-   *
-   * @see org.apache.sling.auth.core.spi.AuthenticationFeedbackHandler#authenticationSucceeded(javax.servlet.http.HttpServletRequest,
-   *      javax.servlet.http.HttpServletResponse,
-   *      org.apache.sling.auth.core.spi.AuthenticationInfo)
-   */
-  public boolean authenticationSucceeded(HttpServletRequest request,
-      HttpServletResponse response, AuthenticationInfo authInfo) {
-    LOGGER.debug("authenticationSucceeded called");
-    // Check for the default post-authentication redirect.
-    return DefaultAuthenticationFeedbackHandler.handleRedirect(request, response);
   }
 
   //----------- Internal ----------------------------
@@ -355,6 +319,7 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
 
   private String retrieveCredentials(String responseBody) {
     String username = null;
+    String pgtIou = null;
     String failureCode = null;
     String failureMessage = null;
 
@@ -374,6 +339,7 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
           StartElement startEl = event.asStartElement();
           QName startElName = startEl.getName();
           String startElLocalName = startElName.getLocalPart();
+          LOGGER.debug(responseBody);
 
           /*
            * Example of failure XML
@@ -406,23 +372,42 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
           */
           if ("authenticationSuccess".equalsIgnoreCase(startElLocalName)) {
             // skip to the user tag start
-            event = eventReader.nextTag();
-            assert event.isStartElement();
-            startEl = event.asStartElement();
-            startElName = startEl.getName();
-            startElLocalName = startElName.getLocalPart();
-            if (!"user".equals(startElLocalName)) {
-              LOGGER.error("Found unexpected element [" + startElName
-                  + "] while inside 'authenticationSuccess'");
-              break;
+            while (eventReader.hasNext()) {
+              event = eventReader.nextTag();
+              if (event.isEndElement()) {
+                if (eventReader.hasNext()) {
+                  event = eventReader.nextTag();
+                } else {
+                  break;
+                }
+              }
+              assert event.isStartElement();
+              startEl = event.asStartElement();
+              startElName = startEl.getName();
+              startElLocalName = startElName.getLocalPart();
+              if (proxy && "proxyGrantingTicket".equals(startElLocalName)) {
+                event = eventReader.nextEvent();
+                assert event.isCharacters();
+                Characters chars = event.asCharacters();
+                pgtIou = chars.getData();
+                LOGGER.debug("XML parser found pgt: {}", pgtIou);
+              } else if ("user".equals(startElLocalName)) {
+                // move on to the body of the user tag
+                event = eventReader.nextEvent();
+                assert event.isCharacters();
+                Characters chars = event.asCharacters();
+                username = chars.getData();
+                LOGGER.debug("XML parser found user: {}", username);
+              } else {
+                LOGGER.error(
+                    "Found unexpected element [{}] while inside 'authenticationSuccess'",
+                    startElName);
+                break;
+              }
+              if (username != null && (!proxy || pgtIou != null)) {
+                break;
+              }
             }
-
-            // move on to the body of the user tag
-            event = eventReader.nextEvent();
-            assert event.isCharacters();
-            Characters chars = event.asCharacters();
-            username = chars.getData();
-            break;
           }
         }
       }
@@ -431,10 +416,39 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
     }
 
     if (failureCode != null || failureMessage != null) {
-      LOGGER.error("Error response from server [code=" + failureCode
-          + ", message=" + failureMessage);
+      LOGGER.error("Error response from server code={} message={}", failureCode,
+          failureMessage);
+    }
+    String pgt = pgts.get(pgtIou);
+    if (pgt != null) {
+      savePgt(username, pgt, pgtIou);
+    } else {
+      LOGGER.debug("Caching '{}' as the IOU for '{}'", pgtIou, username);
+      pgtIOUs.put(pgtIou, username);
     }
     return username;
+  }
+
+  protected void savePgt(String username, String pgt, String pgtIou) {
+    // TODO Auto-generated method stub
+    Map<String, Object> pgtId = new HashMap<String, Object>();
+    pgtId.put("ticket", pgt);
+    String savePath = LitePersonalUtils.getPrivatePath(username) + "/cas";
+    try {
+      Session session = repo.loginAdministrative();
+      ContentManager contentManager = session.getContentManager();
+      LOGGER.debug("Saving pgt '{}' to '{}'", pgtId, savePath);
+      Content storedTicket = new Content(savePath, pgtId);
+      contentManager.update(storedTicket);
+      session.logout();
+    } catch (StorageClientException e) {
+      LOGGER.error("Couldn't save proxy granting ticket: ", e);
+    } catch (AccessDeniedException e) {
+      LOGGER.error("Permission error saving proxy granting ticket: ", e);
+    }
+    // remove the pgtIOU from cache
+    pgts.remove(pgtIou);
+    pgtIOUs.remove(pgtIou);
   }
 
   static final class SsoPrincipal implements Principal {
@@ -452,5 +466,87 @@ public class CasAuthenticationHandler implements AuthenticationHandler,
     public String getName() {
       return principalName;
     }
+  }
+
+  protected String getUseridFromIOU(String pgtIou) {
+    String userid = pgtIOUs.get(pgtIou);
+    return userid;
+  }
+
+  protected String getProxyTicket(String pgt, String target) {
+    String ticket = null;
+    LOGGER.debug("Getting proxy ticket for service: '{}' with pgt: '{}'", target, pgt);
+    String proxyTicketUrl = serverUrl + "/proxy?targetService=" + target + "&pgt=" + pgt;
+    GetMethod get = new GetMethod(proxyTicketUrl);
+    HttpClient httpClient = new HttpClient();
+    int returnCode;
+    try {
+      returnCode = httpClient.executeMethod(get);
+      if (returnCode >= 200 && returnCode < 300) {
+        ticket = getProxyTicketFromXml(get.getResponseBodyAsString());
+      }
+    } catch (HttpException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return ticket;
+  }
+
+  private String getProxyTicketFromXml(String responseBody) {
+    String ticket = null;
+
+    try {
+      XMLInputFactory xmlInputFactory = new WstxInputFactory();
+      xmlInputFactory.setProperty(XMLInputFactory.IS_COALESCING, true);
+      xmlInputFactory.setProperty(XMLInputFactory.IS_VALIDATING, false);
+      xmlInputFactory.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, true);
+      XMLEventReader eventReader = xmlInputFactory.createXMLEventReader(new StringReader(
+          responseBody));
+      LOGGER.debug(responseBody);
+
+      while (eventReader.hasNext()) {
+        XMLEvent event = eventReader.nextEvent();
+
+        // process the event if we're starting an element
+        if (event.isStartElement()) {
+          StartElement startEl = event.asStartElement();
+          QName startElName = startEl.getName();
+          String startElLocalName = startElName.getLocalPart();
+
+          // Example XML
+          // <cas:serviceResponse>
+          // <cas:proxySuccess>
+          // <cas:proxyTicket>PT-957-ZuucXqTZ1YcJw81T3dxf</cas:proxyTicket>
+          // </cas:proxySuccess>
+          // </cas:serviceResponse>
+
+          if ("proxySuccess".equalsIgnoreCase(startElLocalName)) {
+            event = eventReader.nextTag();
+            assert event.isStartElement();
+            startEl = event.asStartElement();
+            startElName = startEl.getName();
+            startElLocalName = startElName.getLocalPart();
+            if ("proxyTicket".equalsIgnoreCase(startElLocalName)) {
+              event = eventReader.nextEvent();
+              assert event.isCharacters();
+              Characters chars = event.asCharacters();
+              ticket = chars.getData();
+            } else {
+              LOGGER.error("Found unexpected element [{}] while inside 'proxySuccess'",
+                  startElName);
+              break;
+            }
+          }
+        }
+      }
+    } catch (XMLStreamException e) {
+      LOGGER.error(e.getMessage(), e);
+    }
+    return ticket;
+  }
+
+  public void setpgt(String pgtIou, String pgt) {
+    pgts.put(pgtIou, pgt);
   }
 }
