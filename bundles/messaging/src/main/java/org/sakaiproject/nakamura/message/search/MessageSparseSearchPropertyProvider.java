@@ -90,7 +90,7 @@ public class MessageSparseSearchPropertyProvider implements SolrSearchPropertyPr
           starter++;
         }
         for (int i = starter; i < commaSeparatedTerms.length; i++) {
-          categoryClauseBuffer.append(" OR " + commaSeparatedTerms[i]);
+          categoryClauseBuffer.append(" OR ").append(commaSeparatedTerms[i]);
         }
       }
       categoryClauseBuffer.append(")");
