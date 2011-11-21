@@ -1,11 +1,16 @@
 {
   "sakai:query-template": "resourceType:sakai/pooled-content AND ((content:(${q}) OR filename:(${q}) OR tag:(${q}) OR description:(${q}) OR ngram:(${q}) OR edgengram:(${q}))${_meViewerGroups})${_mimetype}",
   "sakai:query-template-options": {
-      "sort": "${sortOn} ${sortOrder}"
+      "sort": "${sortOn} ${sortOrder}",
+      "facet" : true,
+      "facet.field" : "tagname",
+      "facet.mincount" : 1
   },
-  "_meViewerGroups": "",
-  "sortOn": "score",
-  "sortOrder": "desc",
+  "sakai:query-template-defaults": {
+    "_meViewerGroups": "",
+    "sortOn": "score",
+    "sortOrder": "desc"
+  },
   "sling:resourceType": "sakai/solr-search",
   "sakai:propertyprovider" : ["PooledContent", "MimeMatch"],
   "sakai:title": "Pooled Content - Me - Viewer",
