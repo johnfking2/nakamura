@@ -24,20 +24,6 @@
   <name>Sakai Nakamura :: User Extension Bundle</name>
   <description>Extension bundle that provides additional functionality in the user area as
     required by Sakai.</description>
-  <repositories>
-    <repository>
-      <id>sakai-maven</id>
-      <name>Sakai Maven Repo</name>
-      <layout>default</layout>
-      <url>http://source.sakaiproject.org/maven2</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-    </repository>
-  </repositories>
 
   <build>
     <plugins>
@@ -182,7 +168,7 @@
     <dependency>
       <groupId>org.apache.sling</groupId>
       <artifactId>org.apache.sling.commons.scheduler</artifactId>
-    </dependency>    
+    </dependency>
     <dependency>
       <groupId>org.apache.felix</groupId>
       <artifactId>org.osgi.core</artifactId>
