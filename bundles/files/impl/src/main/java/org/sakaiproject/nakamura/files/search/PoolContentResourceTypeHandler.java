@@ -131,7 +131,7 @@ public class PoolContentResourceTypeHandler implements IndexingHandler, QoSIndex
   public int getTtl(Event event) {
     // have to be > 0 based on the logic in ContentEventListener.
     // see org.sakaiproject.nakamura.solr.Utils.defaultMax(int)
-    return 1;
+    return 50;
   }
 
   // ---------- IndexingHandler interface --------------------------------------
@@ -198,9 +198,10 @@ public class PoolContentResourceTypeHandler implements IndexingHandler, QoSIndex
               }
             } else {
               try {
+                // tika handles the closing of the input stream
                 InputStream contentStream = contentManager.getInputStream(path);
                 if (contentStream != null) {
-                  String extracted = tika.parseToString(contentManager.getInputStream(path));
+                  String extracted = tika.parseToString(contentStream);
                   doc.addField("content", extracted);
                 }
               } catch (TikaException e) {
