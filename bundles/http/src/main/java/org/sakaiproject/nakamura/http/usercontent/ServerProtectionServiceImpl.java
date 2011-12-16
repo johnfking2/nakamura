@@ -102,7 +102,7 @@ public class ServerProtectionServiceImpl implements ServerProtectionService {
   private static final String HMAC_SHA512 = "HmacSHA512";
   private static final String HMAC_PARAM = ":hmac";
   private static final String[] DEFAULT_TRUSTED_HOSTS = { "localhost:8080 = http://localhost:8082" };
-  private static final String[] DEFAULT_TRUSTED_PATHS = { "/dev", "/devwidgets", "/system", "/logout" };
+  private static final String[] DEFAULT_TRUSTED_PATHS = { "/dev", "/devwidgets", "/system", "/logout", "/var" };
   private static final String[] DEFAULT_TRUSTED_EXACT_PATHS = { };
   private static final String DEFAULT_TRUSTED_SECRET_VALUE = "This Must Be set in production";
   private static final String[] DEFAULT_WHITELIST_POST_PATHS = {"/system/console"};
