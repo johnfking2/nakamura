@@ -60,7 +60,8 @@
         <module>bundles/activation-mail</module>
         <module>bundles/email-outgoing</module>
         <module>bundles/activemq</module>
-        <module>bundles/activity</module>
+        <module>bundles/activity/api</module>
+        <module>bundles/activity/impl</module>
         <module>bundles/cluster</module>
         <module>bundles/chat</module>
         <module>bundles/doc</module>
@@ -1135,7 +1136,7 @@
       <dependency>
         <groupId>org.sakaiproject.nakamura</groupId>
         <artifactId>org.sakaiproject.nakamura.solr</artifactId>
-        <version>1.3-20111212</version>
+        <version>1.3</version>
         <scope>provided</scope>
       </dependency>
 
