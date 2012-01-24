@@ -56,6 +56,7 @@ import org.sakaiproject.nakamura.api.search.solr.Result;
 import org.sakaiproject.nakamura.api.search.solr.SolrSearchException;
 import org.sakaiproject.nakamura.api.search.solr.SolrSearchResultSet;
 import org.sakaiproject.nakamura.api.search.solr.SolrSearchServiceFactory;
+import org.sakaiproject.nakamura.api.user.AuthorizableUtil;
 import org.sakaiproject.nakamura.api.user.BasicUserInfoService;
 import org.sakaiproject.nakamura.api.user.UserConstants;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
@@ -265,9 +266,7 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
 //      for(String principal : principals) {
 //        Authorizable group = authorizableManager.findAuthorizable(principal);
         Authorizable group = memberOf.next();
-        if (group == null
-            || !(group instanceof Group)
-            || Group.EVERYONE.equals(group.getId())) {
+        if (!AuthorizableUtil.isRealGroup(group)) {
           // we don't want the "everyone" group in this feed
           continue;
         }
@@ -329,7 +328,7 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
       while (resultIterator.hasNext()) {
         Result contact = resultIterator.next();
         if (contact.getProperties().containsKey("state")) {
-          String state = (String) contact.getProperties().get("state").iterator().next();
+          String state = ((String) contact.getProperties().get("state").iterator().next()).toLowerCase();
           int count = 0;
           if (contacts.containsKey(state)) {
             count = contacts.get(state);
@@ -556,8 +555,9 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
     Map<String, Object> result = new HashMap<String, Object>();
     if (authorizable != null) {
       for (String propName : authorizable.getSafeProperties().keySet()) {
-        if (propName.startsWith("rep:"))
+        if (propName.startsWith("rep:")) {
           continue;
+        }
         Object o = authorizable.getProperty(propName);
         if ( o instanceof Object[] ) {
           Object[] values = (Object[]) o;
