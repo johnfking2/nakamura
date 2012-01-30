@@ -28,17 +28,4 @@ public interface LiteAuthorizablePostProcessService {
   void process(Authorizable user, Session selfRegSession, ModificationType create,
       Map<String, Object[]> parameters) throws Exception;
 
-  /**
-   * Enable post-processing from a service rather than from an HTTP request.
-   *
-   * @param request optional; if non-null, used only in resource resolution
-   * @param authorizable
-   * @param session
-   * @param change
-   * @param parameters
-   * @throws Exception
-   */
-  void process(SlingHttpServletRequest request, Authorizable authorizable, Session session,
-      ModificationType change, Map<String, Object[]> parameters) throws Exception;
-
 }
