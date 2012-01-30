@@ -18,6 +18,8 @@
 package org.sakaiproject.nakamura.user.lite.servlet;
 
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static org.sakaiproject.nakamura.api.user.UserConstants.GROUP_MEMBERSHIPS_PROP;
+import static org.sakaiproject.nakamura.api.user.UserConstants.GROUP_MEMBERS_PROP;
 import static org.sakaiproject.nakamura.api.user.UserConstants.PROP_GROUP_MANAGERS;
 import static org.sakaiproject.nakamura.api.user.UserConstants.PROP_GROUP_VIEWERS;
 
@@ -58,6 +60,7 @@ import org.sakaiproject.nakamura.api.user.LiteAuthorizablePostProcessService;
 import org.sakaiproject.nakamura.api.user.UserConstants;
 import org.sakaiproject.nakamura.user.lite.resource.LiteAuthorizableResourceProvider;
 import org.sakaiproject.nakamura.util.osgi.EventUtils;
+import org.sakaiproject.nakamura.util.parameters.ParameterMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -201,9 +204,10 @@ public class LiteUpdateSakaiGroupServlet extends LiteAbstractSakaiGroupPostServl
    * @throws StorageClientException 
    * @throws AccessDeniedException 
    *
-   * @see org.apache.sling.jackrabbit.usermanager.post.CreateUserServlet#handleOperation(org.apache.sling.api.SlingHttpServletRequest,
+   * @see org.apache.sling.jackrabbit.usermanager.impl.post.CreateUserServlet#handleOperation(org.apache.sling.api.SlingHttpServletRequest,
    *      org.apache.sling.api.servlets.HtmlResponse, java.util.List)
    */
+  @SuppressWarnings("unchecked")
   @Override
   protected void handleOperation(SlingHttpServletRequest request,
       HtmlResponse htmlResponse, List<Modification> changes) throws AccessDeniedException, StorageClientException  {
@@ -271,11 +275,16 @@ public class LiteUpdateSakaiGroupServlet extends LiteAbstractSakaiGroupPostServl
             }
           }
         }
+
+        authorizableCountChanger.notify(GROUP_MEMBERSHIPS_PROP, addViewers, removeViewers);
+
         // the request has passed all the rules that govern non-manager users
         // so we'll grant an administrative session
         releaseSession = true;
         session = session.getRepository().loginAdministrative();
       }
+
+      authorizableCountChanger.notify(GROUP_MEMBERS_PROP, authorizable.getId());
 
       String groupPath = LiteAuthorizableResourceProvider.SYSTEM_USER_MANAGER_GROUP_PREFIX
       + authorizable.getId();
@@ -323,7 +332,7 @@ public class LiteUpdateSakaiGroupServlet extends LiteAbstractSakaiGroupPostServl
       saveAll(session, toSave);
 
       try {
-        postProcessorService.process(authorizable, session, ModificationType.MODIFY, request);
+        postProcessorService.process(authorizable, session, ModificationType.MODIFY, ParameterMap.extractParameters(request));
       } catch (Exception e) {
         LOGGER.warn(e.getMessage(), e);
 
@@ -361,7 +370,7 @@ public class LiteUpdateSakaiGroupServlet extends LiteAbstractSakaiGroupPostServl
   }
 
   /**
-   * @param slingRepository
+   * @param repository
    */
   protected void bindRepository(Repository repository) {
     this.repository = repository;
@@ -369,7 +378,7 @@ public class LiteUpdateSakaiGroupServlet extends LiteAbstractSakaiGroupPostServl
   }
 
   /**
-   * @param slingRepository
+   * @param repository
    */
   protected void unbindRepository(Repository repository) {
     this.repository = null;

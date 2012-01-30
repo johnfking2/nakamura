@@ -91,6 +91,7 @@ public abstract class LiteAbstractSakaiGroupPostServlet extends
         SlingPostConstants.RP_PREFIX + "member", changes, toSave);
   }
 
+  @SuppressWarnings("unchecked")
   protected void updateGroupMembership(SlingHttpServletRequest request, Session session,
       Authorizable authorizable, String paramName, List<Modification> changes, Map<String, Object> toSave) throws AccessDeniedException, StorageClientException  {
     if (authorizable instanceof Group) {
@@ -103,11 +104,21 @@ public abstract class LiteAbstractSakaiGroupPostServlet extends
       AuthorizableManager authorizableManager = session.getAuthorizableManager();
       Joinable groupJoin = getJoinable(group);
 
+      // the group's count of members changed
+      this.authorizableCountChanger.notify(UserConstants.GROUP_MEMBERS_PROP, group.getId());
+
+      // if this is a special contacts group, then change the contact count for the user it points at
+      if (group.getId().startsWith("g-contacts-")) {
+        String userId = group.getId().substring("g-contacts-".length());
+        this.authorizableCountChanger.notify(UserConstants.CONTACTS_PROP, userId);
+      }
+
       // first remove any members posted as ":member@Delete"
       String[] membersToDelete = request.getParameterValues(paramName + SlingPostConstants.SUFFIX_DELETE);
       if (membersToDelete != null) {
         toSave.put(group.getId(), group);
         LOGGER.info("Members to delete {} ",membersToDelete);
+        this.authorizableCountChanger.notify(UserConstants.GROUP_MEMBERSHIPS_PROP, Arrays.asList(membersToDelete));
         for (String member : membersToDelete) {
           String memberId = getAuthIdFromParameter(member);
           group.removeMember(memberId);
@@ -130,6 +141,7 @@ public abstract class LiteAbstractSakaiGroupPostServlet extends
       String[] membersToAdd = request.getParameterValues(paramName);
       if (membersToAdd != null) {
         LOGGER.info("Members to add {} ",membersToAdd);
+        this.authorizableCountChanger.notify(UserConstants.GROUP_MEMBERSHIPS_PROP, Arrays.asList(membersToAdd));
         Group peerGroup = getPeerGroupOf(group, authorizableManager, toSave);
         List<Authorizable> membersToRemoveFromPeer = new ArrayList<Authorizable>();
         for (String member : membersToAdd) {
@@ -173,7 +185,7 @@ public abstract class LiteAbstractSakaiGroupPostServlet extends
               }
               changed = true;
             }
-            if (peerGroup != null && peerGroup.getId() != group.getId()) {
+            if (peerGroup != null && peerGroup.getId().equals(group.getId())) {
               Set<String> members = ImmutableSet.copyOf(peerGroup.getMembers());
               if (members.contains(memberAuthorizable.getId())) {
                 membersToRemoveFromPeer.add(memberAuthorizable);

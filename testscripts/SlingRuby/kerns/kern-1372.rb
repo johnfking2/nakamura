@@ -43,9 +43,8 @@ class TC_Kern1372Test < Test::Unit::TestCase
   end
 
   def test_get_related_content
-    @log.level = Logger::INFO
     @fm = FileManager.new(@s)
-    m = Time.now.to_nsec
+    m = uniqueness()
     user = create_user("user-#{m}")
 	other = create_user("other-#{m}")
 
@@ -142,9 +141,8 @@ class TC_Kern1372Test < Test::Unit::TestCase
   end
 
   def test_related_by_directory
-    @log.level = Logger::DEBUG
     @fm = FileManager.new(@s)
-    m = Time.now.to_nsec
+    m = uniqueness()
     user = create_user("user-#{m}")
 	other = create_user("other-#{m}")
 	directorypath = "CollegeAnnex-#{m}/Psychology-#{m}"
@@ -188,7 +186,7 @@ class TC_Kern1372Test < Test::Unit::TestCase
 
   def test_limit_related_content
     @fm = FileManager.new(@s)
-    m = Time.now.to_nsec
+    m = uniqueness()
     user = create_user("user-#{m}")
 	other = create_user("other-#{m}")
 

@@ -17,7 +17,6 @@
  */
 package org.sakaiproject.nakamura.api.user;
 
-import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.servlets.post.ModificationType;
 import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
@@ -27,7 +26,7 @@ import java.util.Map;
 public interface LiteAuthorizablePostProcessService {
 
   void process(Authorizable user, Session selfRegSession, ModificationType create,
-      SlingHttpServletRequest request) throws Exception;
+      Map<String, Object[]> parameters) throws Exception;
 
   /**
    * Enable post-processing from a service rather than from an HTTP request.

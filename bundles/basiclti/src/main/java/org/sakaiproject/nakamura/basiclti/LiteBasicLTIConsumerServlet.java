@@ -97,7 +97,6 @@ import org.sakaiproject.nakamura.api.lite.accesscontrol.Permission;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.Permissions;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.Security;
 import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
-import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.user.UserConstants;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
@@ -313,8 +312,14 @@ public class LiteBasicLTIConsumerServlet extends SlingAllMethodsServlet {
               settings.putAll(readSensitiveNode(content));
             }
             final Map<String, Object> adminSettings = getAdminSettings(content, false);
-            settings.putAll(adminSettings);
-            renderJson(response.getWriter(), settings);
+            // Starting with the properties we've saved, we override them with admin settings
+            // only when the corresponding admin lock isn't turned on.
+            final Map<String, Object> effectiveSettings = new HashMap<String, Object>();
+            effectiveSettings.putAll(settings);
+            for (final String setting : adminSettings.keySet()) {
+              effectiveSetting(setting, effectiveSettings, adminSettings, settings);
+            }
+            renderJson(response.getWriter(), effectiveSettings);
           } catch (Exception e) {
             sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                 e.getLocalizedMessage(), e, response);

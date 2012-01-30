@@ -17,7 +17,6 @@
  */
 package org.sakaiproject.nakamura.user.counts;
 
-import static org.sakaiproject.nakamura.api.user.UserConstants.PROP_PSEUDO_GROUP;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
@@ -33,7 +32,7 @@ import java.util.Set;
 public class GroupMembersCounter {
 
   private static final Logger LOGGER = LoggerFactory
-      .getLogger(GroupMembersCountChangeListener.class);
+      .getLogger(GroupMembersCounter.class);
 
   /**
    * @param group
