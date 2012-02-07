@@ -493,18 +493,20 @@ public final class DebugMimeTypes implements Detector {
      *            is the mime-type to add.
      */
     void add(MimeType type) {
+      if(type !=null) {
         registry.addType(type.getType());
         types.put(type.getType(), type);
 
         // Update the magics index...
         if (type.hasMagic()) {
-            magics.addAll(Arrays.asList(type.getMagics()));
+           magics.addAll(Arrays.asList(type.getMagics()));
         }
 
         // Update the xml (xmlRoot) index...
         if (type.hasRootXML()) {
-            xmls.add(type);
+           xmls.add(type);
         }
+      }
     }
 
     /**
