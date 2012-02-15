@@ -39,10 +39,8 @@ import static org.sakaiproject.nakamura.api.user.UserConstants.USER_LASTNAME_PRO
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -57,10 +55,12 @@ import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.api.lite.authorizable.Authorizable;
 import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.authorizable.Group;
+import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.solr.IndexingHandler;
 import org.sakaiproject.nakamura.api.solr.RepositorySession;
 import org.sakaiproject.nakamura.api.solr.TopicIndexer;
+import org.sakaiproject.nakamura.api.user.AuthorizableUtil;
 import org.sakaiproject.nakamura.api.user.BasicUserInfoService;
 import org.sakaiproject.nakamura.util.PathUtils;
 import org.slf4j.Logger;
@@ -71,7 +71,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 /**
  *
@@ -111,12 +110,9 @@ public class AuthorizableIndexingHandler implements IndexingHandler {
     builder.put(LASTMODIFIED_FIELD, Content.LASTMODIFIED_FIELD);    
     builder.put(COUNTS_LAST_UPDATE_PROP, "countLastUpdate");
     builder.put(PROP_GROUP_MANAGERS, "manager");
+    builder.put(SAKAI_EXCLUDE, "exclude");
     GROUP_WHITELISTED_PROPS = builder.build();
   }
-
-  // list of authorizables to not index
-  private static final Set<String> BLACKLISTED_AUTHZ = ImmutableSet.of("admin",
-    "g-contacts-admin", "anonymous", "owner", "system");
 
   private static final String SAKAI_PSEUDOGROUPPARENT_PROP = "sakai:parent-group-id";
 
@@ -167,18 +163,11 @@ public class AuthorizableIndexingHandler implements IndexingHandler {
       // get the name of the authorizable (user,group)
       String authName = String.valueOf(event.getProperty(FIELD_PATH));
       Authorizable authorizable = getAuthorizable(authName, repositorySession);
-      if (authorizable != null) {
-        // KERN-1822 check if the authorizable is marked to be excluded from searches
-        if (Boolean.parseBoolean(String.valueOf(authorizable.getProperty(SAKAI_EXCLUDE)))) {
-          return documents;
-        }
+      SolrInputDocument doc = createAuthDoc(authorizable, repositorySession);
+      if (doc != null) {
+        documents.add(doc);
 
-        SolrInputDocument doc = createAuthDoc(authorizable, repositorySession);
-        if (doc != null) {
-          documents.add(doc);
-
-          logger.info("{} authorizable for searching: {}", topic, authName);
-        }
+        logger.info("{} authorizable for searching: {}", topic, authName);
       }
     }
     logger.debug("Got documents {} ", documents);
@@ -199,13 +188,6 @@ public class AuthorizableIndexingHandler implements IndexingHandler {
     if (topic.endsWith(DELETE_TOPIC)) {
       logger.debug("GetDelete for {} ", event);
       retval = ImmutableList.of("id:" + ClientUtils.escapeQueryChars(authName));
-    } else {
-      // KERN-1822 check if the authorizable is marked to be excluded from searches
-      Authorizable authorizable = getAuthorizable(authName, repositorySession);
-      if (authorizable != null
-          && Boolean.parseBoolean(String.valueOf(authorizable.getProperty(SAKAI_EXCLUDE)))) {
-        retval = ImmutableList.of("id:" + ClientUtils.escapeQueryChars(authName));
-      }
     }
     return retval;
 
@@ -221,7 +203,15 @@ public class AuthorizableIndexingHandler implements IndexingHandler {
    * @return The SolrInputDocument or null if authorizable shouldn't be indexed.
    */
   protected SolrInputDocument createAuthDoc(Authorizable authorizable, RepositorySession repositorySession) {
-    if (!isUserFacing(authorizable)) {
+    if (authorizable == null) {
+      return null;
+    }
+
+    boolean isAnonymous = User.ANON_USER.equals(authorizable.getId());
+    boolean isUserFacingGroup = AuthorizableUtil.isUserFacing(authorizable, true);
+    boolean hasManagedGroup = authorizable.hasProperty(PROP_MANAGED_GROUP);
+
+    if (isAnonymous || !isUserFacingGroup || hasManagedGroup) {
       return null;
     }
 
@@ -293,30 +283,6 @@ public class AuthorizableIndexingHandler implements IndexingHandler {
     doc.setField(FIELD_ID, authName);
 
     return doc;
-  }
-
-  /**
-   * Check if an authorizable is user facing.
-   * 
-   * KERN-1607 don't include manager groups in the index KERN-1600 don't include contact
-   * groups in the index
-   * 
-   * @param auth
-   *          The authorizable to check
-   * @return true if the authorizable is not blacklisted and (is not a group or (is not a
-   *         managing group and has a non-blank title)). false otherwise.
-   */
-  protected boolean isUserFacing(Authorizable auth) {
-    if (auth == null || auth.getId() == null) {
-      return false;
-    }
-
-    boolean isBlacklisted = BLACKLISTED_AUTHZ.contains(auth.getId());
-    boolean isNotManagingGroup = !auth.hasProperty(PROP_MANAGED_GROUP);
-    boolean hasTitleAndNotBlank = auth.hasProperty(GROUP_TITLE_PROPERTY)
-        && !StringUtils.isBlank(String.valueOf(auth.getProperty(GROUP_TITLE_PROPERTY)));
-
-    return !isBlacklisted && (!auth.isGroup() || (isNotManagingGroup && hasTitleAndNotBlank));
   }
 
   /**

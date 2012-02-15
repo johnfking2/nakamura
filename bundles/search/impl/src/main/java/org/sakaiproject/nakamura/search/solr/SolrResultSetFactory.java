@@ -31,6 +31,7 @@ import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.commons.osgi.PropertiesUtil;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrQuery.ORDER;
+import org.apache.solr.client.solrj.SolrRequest.METHOD;
 import org.apache.solr.client.solrj.SolrServer;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -76,6 +77,8 @@ public class SolrResultSetFactory implements ResultSetFactory {
   private static final String SLOW_QUERY_TIME = "slowQueryTime";
   @Property(intValue = 100)
   private static final String DEFAULT_MAX_RESULTS = "defaultMaxResults";
+  @Property(value = "POST")
+  private static final String HTTP_METHOD = "httpMethod";
 
   /** only used to mark the logger */
   private final class SlowQueryLogger { }
@@ -92,6 +95,7 @@ public class SolrResultSetFactory implements ResultSetFactory {
   private int defaultMaxResults = 100; // set to 100 to allow testing
   private long slowQueryThreshold;
   private long verySlowQueryThreshold;
+  private METHOD queryMethod;
 
   @Activate
   protected void activate(Map<?, ?> props) {
@@ -99,6 +103,7 @@ public class SolrResultSetFactory implements ResultSetFactory {
         defaultMaxResults);
     slowQueryThreshold = PropertiesUtil.toLong(props.get(SLOW_QUERY_TIME), 10L);
     verySlowQueryThreshold = PropertiesUtil.toLong(props.get(VERY_SLOW_QUERY_TIME), 100L);
+    queryMethod = METHOD.valueOf(PropertiesUtil.toString(props.get(HTTP_METHOD), "POST"));
   }
 
   /**
@@ -160,6 +165,11 @@ public class SolrResultSetFactory implements ResultSetFactory {
         }
       }
 
+      // filter out 'excluded' items. these are indexed because we do need to search for
+      // some things on the server that the UI doesn't want (e.g. collection groups)
+      filterQueries.add("-exclude:true");
+
+      // filter out deleted items
       List<String> deletedPaths = deletedPathsService.getDeletedPaths();
       if (!deletedPaths.isEmpty()) {
         // these are escaped as they are collected
@@ -178,7 +188,7 @@ public class SolrResultSetFactory implements ResultSetFactory {
         }
       }
       long tquery = System.currentTimeMillis();
-      QueryResponse response = solrServer.query(solrQuery);
+      QueryResponse response = solrServer.query(solrQuery, queryMethod);
       tquery = System.currentTimeMillis() - tquery;
       try {
         if ( tquery > verySlowQueryThreshold ) {
@@ -215,7 +225,7 @@ public class SolrResultSetFactory implements ResultSetFactory {
     SolrQuery solrQuery = new SolrQuery(queryString);
     long[] ranges = SolrSearchUtil.getOffsetAndSize(request, options);
     solrQuery.setStart((int) ranges[0]);
-    solrQuery.setRows((int) ranges[1]);
+    solrQuery.setRows(Math.min(defaultMaxResults, (int) ranges[1]));
 
     // add in some options
     if (options != null) {
