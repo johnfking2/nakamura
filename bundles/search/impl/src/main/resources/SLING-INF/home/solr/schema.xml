@@ -667,12 +667,7 @@
         alternately, change the type="ignored" to some other type e.g. "text" if you want 
         unknown fields indexed and/or stored by default --> 
    <!--dynamicField name="*" type="ignored" multiValued="true" /-->
-
-   <!-- MyBerkeley additions -->
-   <field name="myb-demographics" type="string" indexed="true" stored="false" multiValued="true"/>
-   <field name="myb-context" type="string" indexed="true" stored="false" multiValued="false"/>
-   <dynamicField name="*_tdt" type="tdate"  indexed="true"  stored="true"/>
-
+   
  </fields>
 
  <!-- Field to use to determine and enforce document uniqueness. 
