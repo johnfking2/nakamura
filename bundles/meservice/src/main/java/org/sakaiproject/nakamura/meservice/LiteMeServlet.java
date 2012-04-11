@@ -412,7 +412,7 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
     try {
       String store = messagingService.getFullPathToStore(au.getId(), session);
       store = ISO9075.encodePath(store);
-      String queryString = "messagestore:" + ClientUtils.escapeQueryChars(store) + " AND resourceType:sakai/message AND type:internal AND messagebox:inbox AND read:false";
+      String queryString = "messagestore:" + ClientUtils.escapeQueryChars(store) + " AND type:internal AND messagebox:inbox AND read:false";
       final Map<String, Object> queryOptions = ImmutableMap.of(
           PARAMS_ITEMS_PER_PAGE, (Object) "0",
           CommonParams.START, "0"
