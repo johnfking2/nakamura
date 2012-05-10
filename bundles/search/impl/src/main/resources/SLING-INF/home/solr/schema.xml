@@ -695,6 +695,7 @@
  -->
    <!-- fields to copy to ngram field for better searching
     in the middle of a term -->
+<!--
    <copyField source="content" dest="ngram"/>
    <copyField source="filename" dest="ngram"/>
    <copyField source="tag" dest="ngram"/>
@@ -705,9 +706,10 @@
    <copyField source="title" dest="ngram"/>
    <copyField source="description" dest="ngram"/>
    <copyField source="widgetdata" dest="ngram"/>
-
+-->
    <!-- fields to copy to edgengram field for better searching on
     strings that "start with <query>" -->
+<!--
    <copyField source="content" dest="edgengram"/>
    <copyField source="filename" dest="edgengram"/>
    <copyField source="tag" dest="edgengram"/>
@@ -718,7 +720,7 @@
    <copyField source="title" dest="edgengram"/>
    <copyField source="description" dest="edgengram"/>
    <copyField source="widgetdata" dest="edgengram"/>
-
+-->
    <!-- field to copy to general field for better searching on
     lots of fields at once -->
    <copyField source="content" dest="general"/>
