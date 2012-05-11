@@ -17,6 +17,7 @@
     <groupId>org.sakaiproject.nakamura</groupId>
     <artifactId>base</artifactId>
     <version>1.2.0</version>
+    <relativePath>../../pom.xml</relativePath>
   </parent>
   <artifactId>org.sakaiproject.nakamura.forcemigration</artifactId>
   <packaging>bundle</packaging>
