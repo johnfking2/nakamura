@@ -122,10 +122,8 @@ public class AuthorizableIndexingHandler implements IndexingHandler {
       GROUP_TITLE_PROPERTY
   );
   private final static Set<String> EDGE_NGRAM_PROPS = ImmutableSet.of(
-      NAME_FIELD,
       USER_FIRSTNAME_PROPERTY,
       USER_LASTNAME_PROPERTY,
-      USER_EMAIL_PROPERTY,
       GROUP_TITLE_PROPERTY
   );
 
