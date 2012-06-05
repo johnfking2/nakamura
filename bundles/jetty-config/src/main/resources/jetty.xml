@@ -74,5 +74,25 @@
          </New>
       </Arg>
     </Call>
+    <!-- =========================================================== -->
+    <!-- Add an JMXServiceURL for using JMXMP - JMX over TCP - to get a round randomly assigned RMI ports behind a firewall issue  -->
+    <!-- =========================================================== -->    
+    <Call id="jmxConnector" class="javax.management.remote.JMXConnectorServerFactory" name="newJMXConnectorServer">
+     <Arg>
+       <New  class="javax.management.remote.JMXServiceURL">
+         <Arg>service:jmx:jmxmp://127.0.0.1:5555</Arg>
+       </New>
+     </Arg>
+     <Arg>
+       <Map>
+         <Entry>
+           <Item>jmx.remote.server.address.wildcard</Item>
+           <Item>false</Item>                                                                                                                                              
+         </Entry>
+       </Map>
+     </Arg>
+     <Arg><Ref id="MBeanServer"/></Arg>
+     <Call name="start"/>
+   </Call>
 
 </Configure>

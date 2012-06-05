@@ -147,6 +147,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+     <groupId>javax.management</groupId>
+     <artifactId>jmxremote_optional</artifactId>
+     <version>1.0.1_04</version>
+    </dependency>    
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
