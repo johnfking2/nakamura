@@ -13,7 +13,7 @@
     <packaging>bundle</packaging>
     <name>Sakai Nakamura :: Upgrade Bundle</name>
     <description>Bundle that provides framework and management services for data upgrades.</description>
-.
+    
     <build>
         <plugins>
             <plugin>
