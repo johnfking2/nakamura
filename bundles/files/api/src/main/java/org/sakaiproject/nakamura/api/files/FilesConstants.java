@@ -40,6 +40,13 @@ public interface FilesConstants {
   public static final String USER_FILESTORE = "/_user/files";
 
   /**
+   * Indicates the format of this data according to a version number.
+   * As we make changes to the ad-hoc schema, we increment the version.
+   * This property tells us the format in use on any given content.
+   */
+  public static final String SCHEMA_VERSION = "sakai:schemaversion";
+
+  /**
    * sakai:tags
    */
   public static final String SAKAI_TAGS = "sakai:tags";
@@ -131,6 +138,11 @@ public interface FilesConstants {
    * The name of the property that holds the comment.
    */
   public static final String POOLED_CONTENT_COMMENT = "comment";
+
+  /**
+   * The name of the property that holds the count of comments on this content
+   */
+  public static final String POOLED_CONTENT_COMMENT_COUNT = "commentCount";
 
   /**
    * Property on the file node indicating who the content was created for.

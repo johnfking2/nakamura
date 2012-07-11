@@ -21,6 +21,7 @@ import static org.sakaiproject.nakamura.api.profile.ProfileConstants.USER_PROFIL
 import static org.sakaiproject.nakamura.api.profile.ProfileConstants.GROUP_PROFILE_RT;
 import static org.sakaiproject.nakamura.api.user.UserConstants.GROUP_DESCRIPTION_PROPERTY;
 import static org.sakaiproject.nakamura.api.user.UserConstants.GROUP_TITLE_PROPERTY;
+import static org.sakaiproject.nakamura.api.user.UserConstants.USER_RESPONSE_CACHE;
 
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
@@ -36,6 +37,7 @@ import org.apache.sling.api.wrappers.ValueMapDecorator;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.JSONObject;
 import org.apache.sling.commons.osgi.PropertiesUtil;
+import org.sakaiproject.nakamura.api.http.cache.DynamicContentResponseCache;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessControlManager;
@@ -84,12 +86,20 @@ public class ProfileServiceImpl implements ProfileService {
   static final String EMAIL_LOCATION = "sakai.profile.email.location";
   private String emailLocation;
 
+  @Property(boolValue = false)
+  static final String SCAN_PROVIDER = "should-scan-for-providers";
+  private Boolean shouldScanForProviders;
+
   @Reference
   private BasicUserInfoService basicUserInfoService;
+
+  @Reference
+  private DynamicContentResponseCache responseCache;
 
   @Activate @Modified
   protected void activate(Map<?, ?> props) {
     emailLocation = PropertiesUtil.toString(props.get(EMAIL_LOCATION), null);
+    shouldScanForProviders = PropertiesUtil.toBoolean(props.get(SCAN_PROVIDER), false);
   }
 
   public String getEmailLocation() {
@@ -191,12 +201,14 @@ public class ProfileServiceImpl implements ProfileService {
    */
   public ValueMap getResolvedProfileMap(Authorizable authorizable, Content profileContent, Session jcrSession) throws RepositoryException {
     // Get the data from our external providers.
-    Map<String, List<ProviderSettings>> providersMap = scanForProviders(profileContent, jcrSession);
-    Map<Content, Future<Map<String, Object>>> providedNodeData = new HashMap<Content, Future<Map<String, Object>>>();
-    for (Entry<String, List<ProviderSettings>> e : providersMap.entrySet()) {
-      ProfileProvider pp = providers.get(e.getKey());
-      if (pp != null) {
-        providedNodeData.putAll(pp.getProvidedMap(e.getValue()));
+    Map<String, Future<Map<String, Object>>> providedNodeData = new HashMap<String, Future<Map<String, Object>>>();
+    if (shouldScanForProviders) {
+      Map<String, List<ProviderSettings>> providersMap = scanForProviders(profileContent, jcrSession);
+      for (Entry<String, List<ProviderSettings>> e : providersMap.entrySet()) {
+        ProfileProvider pp = providers.get(e.getKey());
+        if (pp != null) {
+          providedNodeData.putAll(pp.getProvidedMap(e.getValue()));
+        }
       }
     }
     try {
@@ -232,13 +244,12 @@ public class ProfileServiceImpl implements ProfileService {
    * @throws InterruptedException
    * @throws ExecutionException
    */
-  protected void handleNode(Content profileContent, Map<Content, Future<Map<String, Object>>> baseMap,
+  protected void handleNode(Content profileContent, Map<String, Future<Map<String, Object>>> baseMap,
       Map<String, Object> map) throws RepositoryException, InterruptedException,
       ExecutionException {
-    // If our map contains this node, that means one of the provides had some information
-    // for it.
-    // We will use the provider.
-    if (baseMap.containsKey(profileContent.getPath())) {
+    // If our map contains this node, that means one of the providers had some information
+    // for it. We will use this provider.
+    if (!baseMap.isEmpty() && baseMap.containsKey(profileContent.getPath())) {
       map.putAll(baseMap.get(profileContent.getPath()).get());
     } else {
 
@@ -278,6 +289,9 @@ public class ProfileServiceImpl implements ProfileService {
   private Map<String, List<ProviderSettings>> scanForProviders(Content profileContent, Session jcrSession)
       throws RepositoryException {
     Map<String, List<ProviderSettings>> providerMap = new HashMap<String, List<ProviderSettings>>();
+    if (!shouldScanForProviders){
+      return providerMap;
+    }
     return scanForProviders("", profileContent, providerMap, jcrSession);
   }
 
@@ -331,6 +345,7 @@ public class ProfileServiceImpl implements ProfileService {
   public void update(org.sakaiproject.nakamura.api.lite.Session session, String profilePath,
       JSONObject json, boolean replace, boolean replaceProperties, boolean removeTree)
       throws StorageClientException, AccessDeniedException, JSONException {
+    responseCache.invalidate(USER_RESPONSE_CACHE, session.getUserId());
     String objectName = PathUtils.lastElement(profilePath);
     ContentManager contentManager = session.getContentManager();
     String authorizableId = PathUtils.getAuthorizableId(profilePath);

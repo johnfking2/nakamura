@@ -20,7 +20,11 @@ package org.sakaiproject.nakamura.meservice;
 import static org.sakaiproject.nakamura.api.connections.ConnectionState.ACCEPTED;
 import static org.sakaiproject.nakamura.api.connections.ConnectionState.INVITED;
 import static org.sakaiproject.nakamura.api.connections.ConnectionState.PENDING;
+import static org.sakaiproject.nakamura.api.search.solr.SolrSearchConstants.PARAMS_ITEMS_PER_PAGE;
 
+import com.google.common.collect.ImmutableMap;
+
+import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.sling.SlingServlet;
 import org.apache.jackrabbit.util.ISO9075;
@@ -31,6 +35,7 @@ import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
 import org.apache.sling.api.wrappers.ValueMapDecorator;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.solr.client.solrj.util.ClientUtils;
+import org.apache.solr.common.params.CommonParams;
 import org.sakaiproject.nakamura.api.connections.ConnectionConstants;
 import org.sakaiproject.nakamura.api.connections.ConnectionManager;
 import org.sakaiproject.nakamura.api.doc.BindingType;
@@ -39,6 +44,7 @@ import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
+import org.sakaiproject.nakamura.api.http.cache.DynamicContentResponseCache;
 import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
@@ -48,9 +54,6 @@ import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.message.LiteMessagingService;
 import org.sakaiproject.nakamura.api.message.MessagingException;
-import org.sakaiproject.nakamura.api.messagebucket.MessageBucketException;
-import org.sakaiproject.nakamura.api.messagebucket.MessageBucketService;
-import org.sakaiproject.nakamura.api.profile.ProfileService;
 import org.sakaiproject.nakamura.api.search.solr.Query;
 import org.sakaiproject.nakamura.api.search.solr.Result;
 import org.sakaiproject.nakamura.api.search.solr.SolrSearchException;
@@ -59,21 +62,24 @@ import org.sakaiproject.nakamura.api.search.solr.SolrSearchServiceFactory;
 import org.sakaiproject.nakamura.api.user.AuthorizableUtil;
 import org.sakaiproject.nakamura.api.user.BasicUserInfoService;
 import org.sakaiproject.nakamura.api.user.UserConstants;
+import org.sakaiproject.nakamura.api.util.LocaleUtils;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.sakaiproject.nakamura.util.LitePersonalUtils;
 import org.sakaiproject.nakamura.util.PathUtils;
+import org.sakaiproject.nakamura.util.ServletUtils;
+import org.sakaiproject.nakamura.util.telemetry.TelemetryCounter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.MissingResourceException;
 import java.util.Set;
 import java.util.TimeZone;
 
@@ -81,7 +87,7 @@ import javax.jcr.RepositoryException;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
 
-@ServiceDocumentation(name = "MeServlet", okForVersion = "1.1",
+@ServiceDocumentation(name = "MeServlet", okForVersion = "1.2",
     shortDescription = "Returns information about the current active user.",
     description = "Presents information about current user in JSON format.",
     bindings = @ServiceBinding(type = BindingType.PATH, bindings = "/system/me"),
@@ -96,7 +102,6 @@ import javax.servlet.http.HttpServletResponse;
       "        \"subjects\": [],\n" +
       "        \"superUser\": false\n" +
       "    },\n" +
-      "    \"eventbus\": \"http://localhost:8080/system/uievent/default?token=YW5vbnltb3VzOzEzMGYzMmU3NDM3O2RlZmF1bHQ7ZXdLeUlvQ3phUnNXRlBXMHFyVFlsKzFQVkMwPQ&server=2324-Zachs-Mac.local&user=anonymous\",\n" +
       "    \"profile\": {\n" +
       "        \"basic\": {\n" +
       "            \"access\": \"everybody\",\n" +
@@ -122,13 +127,11 @@ import javax.servlet.http.HttpServletResponse;
       "}<pre>"),
     @ServiceResponse(code = 401, description = "Unauthorized: credentials provided were not acceptable to return information for."),
     @ServiceResponse(code = 500, description = "Unable to return information about current user.") }))
-@SlingServlet(paths = { "/system/me" }, generateComponent = true, generateService = true, methods = { "GET" })
+@SlingServlet(paths = { "/system/me" }, generateComponent = false, methods = { "GET" })
+@Component
 public class LiteMeServlet extends SlingSafeMethodsServlet {
-
   private static final long serialVersionUID = -3786472219389695181L;
   private static final Logger LOG = LoggerFactory.getLogger(LiteMeServlet.class);
-  private static final String LOCALE_FIELD = "locale";
-  private static final String TIMEZONE_FIELD = "timezone";
 
   @Reference
   protected transient LiteMessagingService messagingService;
@@ -137,15 +140,16 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
   protected transient ConnectionManager connectionManager;
 
   @Reference
-  protected transient ProfileService profileService;
+  protected SolrSearchServiceFactory searchServiceFactory;
 
   @Reference
-  private MessageBucketService messageBucketService;
+  protected BasicUserInfoService basicUserInfoService;
 
   @Reference
-  SolrSearchServiceFactory searchServiceFactory;
+  protected DynamicContentResponseCache dynamicContentResponseCache;
+
   @Reference
-  BasicUserInfoService basicUserInfoService;
+  protected transient LocaleUtils localeUtils;
 
   /**
    * {@inheritDoc}
@@ -156,10 +160,13 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
   @Override
   protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response)
       throws ServletException, IOException {
+    if (dynamicContentResponseCache.send304WhenClientHasFreshETag(UserConstants.USER_RESPONSE_CACHE, request, response)) {
+      return;
+    }
+    TelemetryCounter.incrementValue("meservice", "LiteMeServlet", "/system/me");
     try {
       response.setContentType("application/json");
       response.setCharacterEncoding("UTF-8");
-      javax.jcr.Session jcrSession = request.getResourceResolver().adaptTo(javax.jcr.Session.class);
       final Session session = StorageClientUtils.adaptToSession(request
           .getResourceResolver().adaptTo(javax.jcr.Session.class));
       if (session == null) {
@@ -181,26 +188,15 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
       }
       PrintWriter w = response.getWriter();
       ExtendedJSONWriter writer = new ExtendedJSONWriter(w);
+      writer.setTidy(ServletUtils.isTidy(request));
       writer.object();
       // User info
       writer.key("user");
       writeUserJSON(writer, session, au, request);
 
-      try {
-        String messageBucketUrl = messageBucketService.getBucketUrl(request, "default");
-        if ( messageBucketUrl != null) {
-          writer.key("eventbus");
-          writer.value(messageBucketUrl);
-        }
-      } catch ( MessageBucketException e) {
-        LOG.warn("Failed to create message bucket URL {} "+e.getMessage());
-        LOG.debug("Failed to create message bucket URL {} "+e.getMessage(),e);
-
-      }
-
       // Dump this user his info
       writer.key("profile");
-      ValueMap profile = profileService.getProfileMap(au,jcrSession);
+      ValueMap profile = new ValueMapDecorator(basicUserInfoService.getProperties(au));
       writer.valueMap(profile);
 
       // Dump this user his number of unread messages.
@@ -209,13 +205,16 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
 
       // Dump this user his number of contacts.
       writer.key("contacts");
-      writeContactCounts(writer, session, au, request);
+      writeContactCounts(writer, au, request);
 
       // Dump the groups for this user.
       writer.key("groups");
-      writeGroups(writer, session, au, jcrSession);
+      writeGroups(writer, session, au);
 
       writer.endObject();
+
+      dynamicContentResponseCache.recordResponse(UserConstants.USER_RESPONSE_CACHE, request, response);
+
     } catch (JSONException e) {
       LOG.error("Failed to create proper JSON response in /system/me", e);
       response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
@@ -228,10 +227,6 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
       LOG.error("Failed to get a user his profile node in /system/me", e);
       response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
           "Access denied error.");
-    } catch (RepositoryException e) {
-      LOG.error("Failed to get a user his profile node in /system/me", e);
-      response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-          "Sparse storage client error.");
     } catch (MessagingException e) {
       LOG.error("Failed to get a user his message counts in /system/me", e);
       response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
@@ -254,7 +249,7 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
    * @throws AccessDeniedException
    * @throws RepositoryException
    */
-  protected void writeGroups(ExtendedJSONWriter writer, Session session, Authorizable au, javax.jcr.Session jcrSession)
+  protected void writeGroups(ExtendedJSONWriter writer, Session session, Authorizable au)
       throws JSONException, StorageClientException, AccessDeniedException {
     AuthorizableManager authorizableManager = session.getAuthorizableManager();
     writer.array();
@@ -298,8 +293,8 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
    * @throws SolrSearchException
    * @throws RepositoryException
    */
-  protected void writeContactCounts(ExtendedJSONWriter writer, Session session,
-      Authorizable au, SlingHttpServletRequest request) throws JSONException, SolrSearchException {
+  protected void writeContactCounts(ExtendedJSONWriter writer, Authorizable au,
+      SlingHttpServletRequest request) throws JSONException, SolrSearchException {
     writer.object();
 
     // We don't do queries for anonymous users. (Possible ddos hole).
@@ -378,9 +373,13 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
     try {
       String store = messagingService.getFullPathToStore(au.getId(), session);
       store = ISO9075.encodePath(store);
-      store = store.substring(0, store.length() - 1);
-      String queryString = "path:" + ClientUtils.escapeQueryChars(store) + " AND resourceType:sakai/message AND type:internal AND messagebox:inbox AND read:false";
-      Query query = new Query(queryString);
+      String queryString = "messagestore:" + ClientUtils.escapeQueryChars(store);
+      final Map<String, Object> queryOptions = ImmutableMap.of(
+          PARAMS_ITEMS_PER_PAGE, (Object) "0",
+          CommonParams.START, "0",
+          CommonParams.FQ, "resourceType:sakai/message AND type:internal AND messagebox:inbox AND read:false"
+      );
+      Query query = new Query(queryString, queryOptions);
       LOG.debug("Submitting Query {} ", query);
       SolrSearchResultSet resultSet = searchServiceFactory.getSearchResultSet(
           request, query, false);
@@ -418,7 +417,7 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
       write.endObject();
     } else {
       Set<String> subjects = getSubjects(authorizable, session.getAuthorizableManager());
-      Map<String, Object> properties = getProperties(authorizable);
+      Map<String, Object> properties = localeUtils.getProperties(authorizable);
 
       write.object();
       writeGeneralInfo(write, authorizable, subjects, properties);
@@ -438,45 +437,40 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
   protected void writeLocale(ExtendedJSONWriter write, Map<String, Object> properties,
       SlingHttpServletRequest request) throws JSONException {
 
-    /* Get the correct locale */
-    Locale l = request.getLocale();
-    if (properties.containsKey(LOCALE_FIELD)) {
-      String locale[] = properties.get(LOCALE_FIELD).toString().split("_");
-      if (locale.length == 2) {
-        l = new Locale(locale[0], locale[1]);
-      }
-    }
-
-    /* Get the correct time zone */
-    TimeZone tz = TimeZone.getDefault();
-    if (properties.containsKey(TIMEZONE_FIELD)) {
-      String timezone = properties.get(TIMEZONE_FIELD).toString();
-      tz = TimeZone.getTimeZone(timezone);
-    }
-    int daylightSavingsOffset = tz.inDaylightTime(new Date()) ? tz.getDSTSavings() : 0;
-    int offset = tz.getRawOffset() + daylightSavingsOffset;
+    final Locale locale = localeUtils.getLocale(properties);
+    final TimeZone tz = localeUtils.getTimeZone(properties);
 
     /* Add the locale information into the output */
     write.key("locale");
     write.object();
     write.key("country");
-    write.value(l.getCountry());
+    write.value(locale.getCountry());
     write.key("displayCountry");
-    write.value(l.getDisplayCountry(l));
+    write.value(locale.getDisplayCountry(locale));
     write.key("displayLanguage");
-    write.value(l.getDisplayLanguage(l));
+    write.value(locale.getDisplayLanguage(locale));
     write.key("displayName");
-    write.value(l.getDisplayName(l));
+    write.value(locale.getDisplayName(locale));
     write.key("displayVariant");
-    write.value(l.getDisplayVariant(l));
+    write.value(locale.getDisplayVariant(locale));
     write.key("ISO3Country");
-    write.value(l.getISO3Country());
+    try {
+      write.value(locale.getISO3Country());
+    } catch (MissingResourceException e) {
+      write.value("");
+      LOG.debug("Unable to find ISO3 country [{}]", locale);
+    }
     write.key("ISO3Language");
-    write.value(l.getISO3Language());
+    try {
+      write.value(locale.getISO3Language());
+    } catch (MissingResourceException e) {
+      write.value("");
+      LOG.debug("Unable to find ISO3 language [{}]", locale);
+    }
     write.key("language");
-    write.value(l.getLanguage());
+    write.value(locale.getLanguage());
     write.key("variant");
-    write.value(l.getVariant());
+    write.value(locale.getVariant());
 
     /* Add the timezone information into the output */
     write.key("timezone");
@@ -484,7 +478,7 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
     write.key("name");
     write.value(tz.getID());
     write.key("GMT");
-    write.value(offset / 3600000);
+    write.value(localeUtils.getOffset(tz));
     write.endObject();
 
     write.endObject();
@@ -552,35 +546,4 @@ public class LiteMeServlet extends SlingSafeMethodsServlet {
     return subjects;
   }
 
-  private Map<String, Object> getProperties(Authorizable authorizable) {
-    Map<String, Object> result = new HashMap<String, Object>();
-    if (authorizable != null) {
-      for (String propName : authorizable.getSafeProperties().keySet()) {
-        if (propName.startsWith("rep:")) {
-          continue;
-        }
-        Object o = authorizable.getProperty(propName);
-        if ( o instanceof Object[] ) {
-          Object[] values = (Object[]) o;
-          switch (values.length) {
-          case 0:
-            continue;
-          case 1:
-            result.put(propName, values[0]);
-            break;
-          default: {
-            StringBuilder valueString = new StringBuilder("");
-            for (int i = 0; i < values.length; i++) {
-              valueString.append("," + values[i]);
-            }
-            result.put(propName, valueString.toString().substring(1));
-          }
-          }
-        } else {
-          result.put(propName, o);
-        }
-      }
-    }
-    return result;
-  }
 }

@@ -18,8 +18,10 @@
 package org.sakaiproject.nakamura.files.pool;
 
 import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_USER_MANAGER;
+import static org.sakaiproject.nakamura.api.files.FilesConstants.POOLED_CONTENT_COMMENT_COUNT;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
@@ -41,6 +43,7 @@ import org.sakaiproject.nakamura.api.doc.ServiceExtension;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
+import org.sakaiproject.nakamura.api.files.FilesConstants;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
 import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.Session;
@@ -54,6 +57,7 @@ import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.lite.content.ContentManager;
 import org.sakaiproject.nakamura.api.user.BasicUserInfoService;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
+import org.sakaiproject.nakamura.util.ServletUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +76,8 @@ import javax.servlet.http.HttpServletResponse;
  * Servlet endpoint for comments associated to a piece of pooled content.
  */
 @SlingServlet(methods = { "GET", "POST", "DELETE" }, extensions = "comments", resourceTypes = { "sakai/pooled-content" })
-@ServiceDocumentation(name = "ContentPoolCommentServlet", okForVersion = "1.1", shortDescription = "Read/Write/Delete comments on a content item.",
+@ServiceDocumentation(name = "ContentPoolCommentServlet", okForVersion = "1.2",
+    shortDescription = "Read/Write/Delete comments on a content item.",
     description = "Read, write, and delete comments associated to a piece of pooled content.",
     bindings = @ServiceBinding(type = BindingType.TYPE, bindings = "sakai/pooled-content",
                 extensions = @ServiceExtension(name = "comments", description = "Accesses the comments on a piece of content.")),
@@ -140,17 +145,6 @@ public class ContentPoolCommentServlet extends SlingAllMethodsServlet implements
     Resource resource = request.getResource();
     Content poolContent = resource.adaptTo(Content.class);
 
-    boolean isTidy = false;
-    String[] selectors = request.getRequestPathInfo().getSelectors();
-    if (selectors != null) {
-      for (int i = 0; i < selectors.length; i++) {
-        String selector = selectors[i];
-        if ("tidy".equals(selector)) {
-          isTidy = true;
-        }
-      }
-    }
-
     try {
       ContentManager contentManager = resource.adaptTo(ContentManager.class);
       Session session = resource.adaptTo(Session.class);
@@ -158,9 +152,33 @@ public class ContentPoolCommentServlet extends SlingAllMethodsServlet implements
       Content comments = contentManager.get(poolContent.getPath() + "/" + COMMENTS);
       response.setContentType("application/json");
       response.setCharacterEncoding("UTF-8");
+      
+      // if there is no commentCount property, then calculate and add 
+      if(!poolContent.hasProperty(POOLED_CONTENT_COMMENT_COUNT)){
+        if (comments!=null){
+          poolContent.setProperty(POOLED_CONTENT_COMMENT_COUNT, Iterables.size(comments.listChildPaths()));
+        } else {
+          poolContent.setProperty(POOLED_CONTENT_COMMENT_COUNT, 0);
+        }
+        
+        Session adminSession = null;
+        try{
+          adminSession = repository.loginAdministrative();
+          ContentManager adminContentManager = adminSession.getContentManager();
+          adminContentManager.update(poolContent, Boolean.FALSE);
+        } finally {
+          if (adminSession != null) {
+            try {
+              adminSession.logout();
+            } catch (Exception e) {
+              LOGGER.error("Could not logout administrative session.");
+            }
+          }         
+        }
+      }
 
       ExtendedJSONWriter w = new ExtendedJSONWriter(response.getWriter());
-      w.setTidy(isTidy);
+      w.setTidy(ServletUtils.isTidy(request));
       w.object();
       w.key(COMMENTS);
       w.array();
@@ -271,6 +289,13 @@ public class ContentPoolCommentServlet extends SlingAllMethodsServlet implements
         String newNodeName = Long.toString(cal.getTimeInMillis());
         path = path + "/" + newNodeName;
         statusCode = HttpServletResponse.SC_CREATED;
+        
+        // increasing commentCount by 1, for a new comment
+        if(poolContent.hasProperty(POOLED_CONTENT_COMMENT_COUNT)){
+          int commentCount = (Integer)poolContent.getProperty(POOLED_CONTENT_COMMENT_COUNT);
+          poolContent.setProperty(POOLED_CONTENT_COMMENT_COUNT, commentCount+1);
+        }
+        contentManager.update(poolContent);
       }
       ImmutableMap.Builder<String,Object> commentPropertiesBuilder = ImmutableMap.builder();
       commentPropertiesBuilder.put(AUTHOR, user);
@@ -355,6 +380,12 @@ public class ContentPoolCommentServlet extends SlingAllMethodsServlet implements
         return;
       }
       contentManager.delete(path);
+      // decreasing commentCount by 1, when a comment is deleted
+      if(poolItem.hasProperty(POOLED_CONTENT_COMMENT_COUNT) ){
+        Integer commentCount = (Integer)poolItem.getProperty(POOLED_CONTENT_COMMENT_COUNT);
+        if (commentCount > 0) poolItem.setProperty(POOLED_CONTENT_COMMENT_COUNT, commentCount-1);
+        contentManager.update(poolItem);
+      }
       response.setStatus(HttpServletResponse.SC_NO_CONTENT);
     } catch (AccessDeniedException e) {
       LOGGER.warn(e.getMessage(), e);

@@ -37,6 +37,7 @@ import org.sakaiproject.nakamura.api.doc.ServiceBinding;
 import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
 import org.sakaiproject.nakamura.api.doc.ServiceExtension;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
+import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.api.doc.ServiceSelector;
 import org.sakaiproject.nakamura.api.files.FilesConstants;
@@ -54,6 +55,7 @@ import org.sakaiproject.nakamura.api.search.solr.SolrSearchServiceFactory;
 import org.sakaiproject.nakamura.files.search.LiteFileSearchBatchResultProcessor;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.sakaiproject.nakamura.util.PathUtils;
+import org.sakaiproject.nakamura.util.ServletUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -72,7 +74,7 @@ import javax.servlet.http.HttpServletResponse;
   @Property(name = "service.description", value = "Provides support for file tagging."),
   @Property(name = "service.vendor", value = "The Sakai Foundation")
 })
-@ServiceDocumentation(name = "DirectoryTagFeedServlet", okForVersion = "1.1",
+@ServiceDocumentation(name = "DirectoryTagFeedServlet", okForVersion = "1.2",
   shortDescription = "Get sample content items for all directory tags.",
   description = {
   "This servlet responds to requests on content of type 'sakai/directory', using the 'tagged' selector.",
@@ -145,7 +147,7 @@ public class DirectoryTagFeedServlet extends SlingSafeMethodsServlet {
     
     request.setAttribute("depth", depth);
     JSONWriter write = new JSONWriter(response.getWriter());
-    write.setTidy(tidy);
+    write.setTidy(ServletUtils.isTidy(request));
     Resource directoryResource = request.getResource();
     try {
       write.object();

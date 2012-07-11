@@ -167,7 +167,7 @@ public class SamlAuthenticationHandlerTest {
   public void dropCredentialsWithLogoutUrl() throws IOException {
     ssoAuthenticationHandler.dropCredentials(request, response);
 
-    verify(request).setAttribute(Authenticator.LOGIN_RESOURCE, "http://localhost/logout");
+    verify(response).sendRedirect("http://localhost/logout");
   }
 
   @Test
@@ -176,7 +176,7 @@ public class SamlAuthenticationHandlerTest {
 
     ssoAuthenticationHandler.dropCredentials(request, response);
 
-    verify(request).setAttribute(Authenticator.LOGIN_RESOURCE, "http://localhost/logout");
+    verify(response).sendRedirect("http://localhost/logout");
   }
 
   @Test
@@ -308,7 +308,7 @@ public class SamlAuthenticationHandlerTest {
         response, authenticationInfo);
     assertFalse(actionTaken);
     verify(postProcessService).process(any(Authorizable.class), any(Session.class),
-        any(ModificationType.class), any(SlingHttpServletRequest.class));
+        any(ModificationType.class), any(Map.class));
   }
 
   @Test

@@ -40,6 +40,7 @@ import org.sakaiproject.nakamura.api.lite.content.Content;
 import org.sakaiproject.nakamura.api.profile.ProfileConstants;
 import org.sakaiproject.nakamura.api.profile.ProfileService;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
+import org.sakaiproject.nakamura.util.ServletUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +71,7 @@ import javax.servlet.http.HttpServletResponse;
         @ServiceResponse(code = 500, description = "Responds with a 500 on any other error")
       })
   },
-  name = "Profile Servlet", okForVersion = "1.1",
+  name = "Profile Servlet", okForVersion = "1.2",
   shortDescription = "Displays the JSON rendering of a user or group profile.",
   description = {
     "This servlet provides a fully rendered profile in json form, when the resource the URL points to is a profile node. If there are any external"
@@ -84,8 +85,6 @@ import javax.servlet.http.HttpServletResponse;
 @SlingServlet(extensions = { "json" }, methods = { "GET" }, selectors = "profile", resourceTypes = {
     ProfileConstants.GROUP_PROFILE_RT, ProfileConstants.USER_PROFILE_RT })
 public class ProfileServlet extends SlingSafeMethodsServlet {
-
-  private static final String TIDY = "tidy";
 
   /**
    *
@@ -120,7 +119,7 @@ public class ProfileServlet extends SlingSafeMethodsServlet {
       ValueMap map = profileService.getProfileMap(profileContent, jcrSession);
       String profileUserId = map.get("userid", String.class);
       ExtendedJSONWriter writer = new ExtendedJSONWriter(response.getWriter());
-      writer.setTidy(isTidy(request));
+      writer.setTidy(ServletUtils.isTidy(request));
       writer.object();
       ExtendedJSONWriter.writeValueMapInternals(writer, map);
       connMgr.writeConnectionInfo(writer, session, currUser, profileUserId);
@@ -142,12 +141,4 @@ public class ProfileServlet extends SlingSafeMethodsServlet {
     }
   }
 
-  private boolean isTidy(SlingHttpServletRequest req) {
-    for (String selector : req.getRequestPathInfo().getSelectors()) {
-      if (TIDY.equals(selector)) {
-        return true;
-      }
-    }
-    return false;
-  }
 }

@@ -45,6 +45,7 @@ import org.sakaiproject.nakamura.api.doc.ServiceExtension;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
+import org.sakaiproject.nakamura.api.http.cache.DynamicContentResponseCache;
 import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
@@ -97,7 +98,7 @@ import javax.servlet.http.HttpServletResponse;
         @ServiceResponse(code = 500, description = "Responds with a 500 on any other error")
       })
   },
-  name = "Profile Update Servlet", okForVersion = "1.1",
+  name = "Profile Update Servlet", okForVersion = "1.2",
   shortDescription = "Endpoint for POSTing changes to a user or group profile.",
   description = {
     "Servlet for writing changes to a user or group profile, via JSON content which is passed as a parameter."

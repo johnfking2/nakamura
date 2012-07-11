@@ -1,9 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Licensed to the Sakai Foundation (SF) under one
+  ~ or more contributor license agreements.  See the NOTICE file
+  ~ distributed with this work for additional information
+  ~ regarding copyright ownership.  The ASF licenses this file
+  ~ to you under the Apache License, Version 2.0 (the
+  ~ "License"); you may not use this file except in compliance
+  ~ with the License.  You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied.  See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.sonatype.oss</groupId>
+    <artifactId>oss-parent</artifactId>
+    <relativePath />
+    <version>7</version>
+  </parent>
   <groupId>org.sakaiproject.nakamura</groupId>
   <artifactId>base</artifactId>
-  <version>1.2-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Sakai Nakamura Project</name>
   <description> Sakai Nakamura is an OSGi server built ontop of Apache Sling, supporting Sakai 3. </description>
@@ -12,6 +36,10 @@
   <prerequisites>
     <maven>2.2.0</maven>
   </prerequisites>
+  <organization>
+    <name>Sakai Project</name>
+    <url>http://sakaiproject.org</url>
+  </organization>
   <scm>
     <connection>scm:git:git://github.com/sakaiproject/nakamura.git</connection>
     <developerConnection>scm:git:git@github.com:sakaiproject/nakamura.git</developerConnection>
@@ -43,6 +71,7 @@
         <module>bundles/messaging</module>
         <module>bundles/files/api</module>
         <module>bundles/files/impl</module>
+        <module>bundles/files/migrator</module>
         <module>bundles/personal</module>
         <module>bundles/presence</module>
         <module>bundles/resource</module>
@@ -54,7 +83,8 @@
         <module>bundles/search/impl</module>
         <module>bundles/discussion</module>
         <module>bundles/smtp</module>
-        <module>bundles/user</module>
+        <module>bundles/user/api</module>
+        <module>bundles/user/impl</module>
         <module>bundles/events</module>
         <module>bundles/batch</module>
         <module>bundles/activation-mail</module>
@@ -63,11 +93,9 @@
         <module>bundles/activity/api</module>
         <module>bundles/activity/impl</module>
         <module>bundles/cluster</module>
-        <module>bundles/chat</module>
         <module>bundles/doc</module>
         <module>bundles/docproxy</module>
         <module>bundles/woodstox</module>
-        <module>bundles/calendar</module>
         <module>bundles/authz</module>
         <module>bundles/basiclti</module>
         <module>bundles/profile/api</module>
@@ -75,7 +103,8 @@
         <module>bundles/tika</module>
         <module>bundles/captcha</module>
         <module>bundles/pages</module>
-        <module>bundles/http</module>
+        <module>bundles/http/api</module>
+        <module>bundles/http/impl</module>
         <module>bundles/directory</module>
         <module>bundles/templates</module>
         <module>bundles/world</module>
@@ -83,6 +112,9 @@
         <module>bundles/upgrade</module>
         <module>bundles/lom</module>
         <module>bundles/content-packaging</module>
+        <module>bundles/postgresqlwrapper</module>
+        <module>bundles/solr</module>
+        <module>bundles/robots.txt</module>
         <module>testscripts</module>
       </modules>
     </profile>
@@ -102,7 +134,6 @@
         <!-- to build oracle you must download and install oracle.jar first  <module>contrib/oracle-jdbc</module> -->
         <!-- <module>contrib/sitejoin</module> -->
         <module>contrib/rootconfig</module>
-        <module>contrib/robots.txt</module>
        </modules>
     </profile>
     <profile>
@@ -440,11 +471,7 @@
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-resources-plugin</artifactId>
-        <version>2.5</version>
-        <configuration>
-          <encoding>${project.build.sourceEncoding}</encoding>
-        </configuration>
+        <artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -459,6 +486,65 @@
     </plugins>
     <pluginManagement>
       <plugins>
+        <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+        <plugin>
+          <groupId>org.eclipse.m2e</groupId>
+          <artifactId>lifecycle-mapping</artifactId>
+          <version>1.0.0</version>
+          <configuration>
+            <lifecycleMappingMetadata>
+              <pluginExecutions>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.felix</groupId>
+                    <artifactId>maven-scr-plugin</artifactId>
+                    <versionRange>[1.7.0,)</versionRange>
+                    <goals><goal>scr</goal></goals>
+                  </pluginExecutionFilter>
+                  <action><ignore /></action>
+                </pluginExecution>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.sling</groupId>
+                    <artifactId>maven-launchpad-plugin</artifactId>
+                    <versionRange>[2.1.0,)</versionRange>
+                    <goals><goal>prepare-package</goal></goals>
+                  </pluginExecutionFilter>
+                  <action><ignore /></action>
+                </pluginExecution>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <versionRange>[2.0,)</versionRange>
+                    <goals>
+                      <goal>copy-dependencies</goal>
+                      <goal>unpack-dependencies</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action><ignore /></action>
+                </pluginExecution>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <versionRange>[1.4,)</versionRange>
+                    <goals><goal>run</goal></goals>
+                  </pluginExecutionFilter>
+                  <action><ignore /></action>
+                </pluginExecution>
+              </pluginExecutions>
+            </lifecycleMappingMetadata>
+          </configuration>
+        </plugin>
+        <plugin>
+	        <groupId>org.apache.maven.plugins</groupId>
+	        <artifactId>maven-resources-plugin</artifactId>
+	        <version>2.5</version>
+	        <configuration>
+            <encoding>${project.build.sourceEncoding}</encoding>
+          </configuration>
+        </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-assembly-plugin</artifactId>
@@ -471,12 +557,14 @@
           <version>1.2.1</version>
           <executions>
             <execution>
+              <id>copy common files</id>
               <goals>
                 <goal>process</goal>
               </goals>
               <configuration>
                 <resourceBundles>
-                  <resourceBundle>org.apache:apache-jar-resource-bundle:1.3</resourceBundle>
+                  <resourceBundle>org.sakaiproject.nakamura:nakamura-jar-resource-bundle:1.0</resourceBundle>
+                  <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
                 </resourceBundles>
               </configuration>
             </execution>
@@ -647,6 +735,11 @@
           <version>2.5.1</version>
           <configuration>
             <aggregate>true</aggregate>
+            <instrumentation>
+            <excludes>
+              <exclude>bundles/postgresqlwrapper/**/*.class</exclude>
+            </excludes>
+            </instrumentation>
           </configuration>
       </plugin>
       <!-- <plugin>
@@ -698,12 +791,13 @@
 <!-- ====================================================================== -->
   <distributionManagement>
     <downloadUrl>http://source.sakaiproject.org/maven2/</downloadUrl>
+    <!--
     <snapshotRepository>
-       <uniqueVersion>false</uniqueVersion>
-       <id>sakai-maven-snapshots-scp</id>
-       <name>Sakai snapshot Repo</name>
-       <url>scp://source.sakaiproject.org/var/www/html/maven2-snapshots</url>
-       <layout>default</layout>
+      <uniqueVersion>false</uniqueVersion>
+      <id>sakai-maven-snapshots-scp</id>
+      <name>Sakai snapshot Repo</name>
+      <url>scp://source.sakaiproject.org/var/www/html/maven2-snapshots</url>
+      <layout>default</layout>
     </snapshotRepository>
     <repository>
       <uniqueVersion>false</uniqueVersion>
@@ -712,6 +806,7 @@
       <url>scp://source.sakaiproject.org/var/www/html/maven2</url>
       <layout>default</layout>
     </repository>
+    -->
     <site>
       <id>sakai-site</id>
       <name>Sakai release Site</name>
@@ -767,6 +862,61 @@
         <enabled>true</enabled>
       </snapshots>
     </repository>
+    <repository>
+      <id>java.net</id>
+      <url>http://download.java.net/maven/2</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+
+    <!-- used by calendar -->
+    <repository>
+      <id>modularity-releases</id>
+      <name>Modularity Maven Repository</name>
+      <url>http://m2.modularity.net.au/releases</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>modularity-snapshots</id>
+      <name>Modularity Snapshot Repository</name>
+      <url>http://m2.modularity.net.au/snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+
+    <!-- used to deploy some bundles -->
+    <repository>
+      <id>OPS4J</id>
+      <name>OPS4J Repository</name>
+      <url>http://repository.ops4j.org/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>sonatype</id>
+      <name>Sonatype OSS Maven repository</name>
+      <url>https://oss.sonatype.org/content/repositories/releases/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
   </repositories>
   <pluginRepositories>
     <pluginRepository>
@@ -807,6 +957,11 @@
       <version>1.3.9</version>
       <scope>provided</scope>
 <!-- just needed for compiling, not runtime -->
+    </dependency>
+    <dependency>
+      <groupId>org.sakaiproject.nakamura</groupId>
+      <artifactId>nakamura-jar-resource-bundle</artifactId>
+      <version>1.0</version>
     </dependency>
   </dependencies>
   <dependencyManagement>
@@ -872,19 +1027,19 @@
       <dependency>
         <groupId>org.easymock</groupId>
         <artifactId>easymockclassextension</artifactId>
-        <version>3.0</version>
+        <version>3.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.easymock</groupId>
         <artifactId>easymock</artifactId>
-        <version>3.0</version>
+        <version>3.1</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-all</artifactId>
-        <version>1.8.5</version>
+        <version>1.9.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -916,7 +1071,7 @@
       <dependency>
         <groupId>org.apache.sling</groupId>
         <artifactId>org.apache.sling.auth.core</artifactId>
-        <version>1.0.6</version>
+        <version>1.0.7</version>
         <scope>provided</scope>
       </dependency>
       <dependency>
@@ -1038,7 +1193,7 @@
       <dependency>
         <groupId>net.sf.ehcache</groupId>
         <artifactId>ehcache-core</artifactId>
-        <version>2.4.6</version>
+        <version>2.4.7</version>
         <scope>provided</scope>
       </dependency>
 
@@ -1138,16 +1293,15 @@
       <dependency>
         <groupId>org.sakaiproject.nakamura</groupId>
         <artifactId>org.sakaiproject.nakamura.core</artifactId>
-        <version>1.3</version>
+        <version>1.3.6-SNAPSHOT</version>
         <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>org.sakaiproject.nakamura</groupId>
         <artifactId>org.sakaiproject.nakamura.solr</artifactId>
-        <version>1.3</version>
+        <version>1.5-SNAPSHOT</version>
         <scope>provided</scope>
       </dependency>
-
     </dependencies>
   </dependencyManagement>
 </project>

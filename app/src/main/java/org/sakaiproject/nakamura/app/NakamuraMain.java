@@ -27,7 +27,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -94,13 +93,13 @@ public class NakamuraMain {
       String resource = NakamuraMain.class.getName().replace('.', '/')
           + ".class";
       URL u = NakamuraMain.class.getClassLoader().getResource(resource);
-      String jarFilePath = u.getFile();
-      jarFilePath = jarFilePath.substring(0, jarFilePath.length()
-          - resource.length() - 2);
-      u = new URL(jarFilePath);
-      File jarFile = new File(u.toURI());
-      info("Loading from " + jarFile, null);
-      long lastModified = jarFile.lastModified();
+      long lastModified = 0;
+      try {
+        lastModified = u.openConnection().getLastModified();
+      } catch (IOException e) {
+        // just let it go. treat it as though we're starting fresh.
+      }
+      info("Loading from " + u.getPath(), null);
 
       File slingHomeFile = new File(slingHome);
       File loaderTimestamp = new File(slingHome, ".lauchpadLastModified");
@@ -142,10 +141,16 @@ public class NakamuraMain {
           info("No runtime, will use contents of launcher jar", null);
         }
         slingHomeFile.mkdirs();
-        FileWriter fw = new FileWriter(loaderTimestamp);
-        fw.write(String.valueOf(lastModified));
-        fw.close();
-        fw = null;
+        FileWriter fw = null;
+        try {
+          fw = new FileWriter(loaderTimestamp);
+          fw.write(String.valueOf(lastModified));
+        } finally {
+          if (fw != null) {
+            fw.close();
+            fw = null;
+          }
+        }
         return true;
       } else {
         info("Runtime image, newer than launcher, using runtime image ",
@@ -153,8 +158,6 @@ public class NakamuraMain {
       }
     } catch (MalformedURLException e) {
       info("Not launching from a jar (malformed url)", null);
-    } catch (URISyntaxException e) {
-      info("Not launching from a jar (uri syntax)", null);
     }
     return false;
 

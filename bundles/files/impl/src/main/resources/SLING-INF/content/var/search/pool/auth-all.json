@@ -1,0 +1,16 @@
+{
+  "sakai:query-template": "${_q}",
+  "sling:resourceType": "sakai/solr-search",
+  "sakai:propertyprovider" : ["LibraryContentQueryHandler"],
+  "sakai:resultprocessor": "LibraryContentQueryHandler",
+  "sakai:title": "Pooled Content - All by direct association",
+  "sakai:shortDescription": "Search through all the pooled files for content that is directly associated to a given user.",
+  "sakai:parameters" : [
+      "{\"name\" : \"userid\", \"description\" : \"The user id of the user to search on behalf of. If omitted, the authenticated user will be used. If the user is anonymous, there will be an error.\"}",
+      "{\"name\" : \"q\", \"description\" : \"A general query to apply to the results\"}",
+      "{\"name\" : \"mimetype\", \"description\" : \"The mimetype of the document\"}",
+      "{\"name\" : \"levels\", \"description\" : \"The number of levels deep to recurse when discovering groups to which the user is associated.\"}",
+      "{\"name\" : \"sortOn\", \"description\" : \"The name of the property you wish to sort on. This only has any affect if it is used with the sortOrder parameter. Default is sakai:filename\"}",
+      "{\"name\" : \"sortOrder\", \"description\" : \"The order you wish to sort in. Either 'ascending' or 'descending'.\"}"
+  ]
+}

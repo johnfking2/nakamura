@@ -30,6 +30,7 @@ import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.doc.DocumentationWriter;
+import org.sakaiproject.nakamura.util.StringUtils;
 
 import java.io.IOException;
 
@@ -40,7 +41,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
 
 @SlingServlet(paths = { "/system/doc/proxy" }, methods = { "GET" })
-@ServiceDocumentation(name = "Proxy documentation", okForVersion = "1.1",
+@ServiceDocumentation(name = "Proxy documentation", okForVersion = "1.2",
   description = "Provides auto documentation of proxy nodes currently in the repository. Documentation will use the "
     + "node properties."
     + " Requests to this servlet take the form /system/doc/proxy?p=&lt;proxynodepath&gt where <em>proxynodepath</em>"
@@ -68,13 +69,16 @@ public class ProxyDocumentationServlet extends SlingSafeMethodsServlet {
   protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response)
       throws ServletException, IOException {
 
+    response.setContentType("text/html");
+    response.setCharacterEncoding("UTF-8");
+
     RequestParameter path = request.getRequestParameter(PATH_PARAM);
     Session session = request.getResourceResolver().adaptTo(Session.class);
 
     DocumentationWriter docWriter = new DocumentationWriter("Proxy nodes", response
         .getWriter());
     try {
-      if (path != null) {
+      if (path != null && !StringUtils.isEmpty(path.getString())) {
         docWriter.writeSearchInfo(path.getString(), session);
       } else {
         String query = "//*[@sling:resourceType='sakai/proxy'] order by sakai:title";

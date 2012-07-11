@@ -61,7 +61,7 @@ import javax.servlet.http.HttpServletResponse;
 
 @ServiceDocumentation(
   name = "External Document Search Servlet",
-  okForVersion = "1.1",
+  okForVersion = "1.2",
   description = "Performs a search by delegating the search request to an external search processor.",
   shortDescription = "Searches external documents",
   bindings = {
@@ -81,7 +81,7 @@ import javax.servlet.http.HttpServletResponse;
 @SlingServlet(resourceTypes = { "sakai/external-repository-search" }, generateComponent = true, generateService = true, extensions = { "json" })
 public class ExternalDocumentSearchServlet extends SlingSafeMethodsServlet {
 
-  private static final String SEARCH_DEFINITION_REGEX = "{(\\w+)(|(\\w+))?}";
+  private static final String SEARCH_DEFINITION_REGEX = "\\{(\\w+)(\\|(\\w+))?}";
   protected ExternalRepositoryProcessorTracker tracker;
   protected ExternalSearchResultSet resultSet;
   protected static final Logger LOGGER = LoggerFactory

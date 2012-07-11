@@ -1,0 +1,19 @@
+{
+    "sling:resourceType": "sakai/solr-search",
+    "sakai:query-template": "${_q}",
+    "sakai:propertyprovider": "PeopleGroupsAutocompleteQueryHandler",
+    "sakai:resultprocessor": "PeopleGroupsAutocompleteQueryHandler",
+    "sakai:title": "Users, Groups",
+    "sakai:shortDescription": "Get the profiles of select users and groups.",
+    "sakai:parameters" : [
+        "{\"name\" : \"q\", \"description\" : \"The substring you want to match against people's names and group titles.\"}",
+        "{\"name\" : \"sortOn\", \"description\" : \"The name of the property you wish to sort on. This only has any affect if it is used with the sortOrder parameter. The default is score\"}",
+        "{\"name\" : \"sortOrder\", \"description\" : \"The order you wish to sort in. Either 'asc' or 'desc'.\"}"
+    ],
+    "sakai:description": [
+        "Get the profiles of users and groups whose names include the provided query term."
+    ],
+    "sakai:response": [
+        "Example: Providing user/group autocompletion for names including 'ja'.<br /> Request to: /var/search/usersgroups.json?q=ja<br /><pre class=\"json\">{\n  \"items\": 25,\n  \"results\": [{\n      \"hash\": \"inst\",\n      \"basic\": {\n        \"access\": \"everybody\",\n        \"elements\": {\n          \"lastName\": {\n            \"value\": \"Inst\"\n          },\n          \"email\": {\n            \"value\": \"inst@example.edu\"\n          },\n          \"role\": {\n            \"value\": \"academic_staff\"\n          },\n          \"firstName\": {\n            \"value\": \"Jane\"\n          }\n        }\n      },\n      \"rep:userId\": \"inst\",\n      \"userid\": \"inst\",\n      \"sakai:excludeSearch\": false,\n      \"homePath\": \"/~inst\",\n      \"user\": \"inst\"\n    },{\n      \"sakai:group-description\": \"Your required rest stop in the OAE.\",\n      \"sakai:category\": \"group\",\n      \"sakai:group-title\": \"Java the Hut\",\n      \"sakai:group-joinable\": \"yes\",\n      \"sakai:group-id\": \"coffeeshop\",\n      \"homePath\": \"/~coffeeshop\",\n      \"groupid\": \"coffeeshop\"\n    }\n  ],\n  \"total\": 2\n}</pre>"
+    ]
+}

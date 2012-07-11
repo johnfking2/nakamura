@@ -48,6 +48,7 @@ import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.proxy.ProxyClientService;
+import org.sakaiproject.nakamura.util.ServletUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,7 +118,7 @@ import javax.servlet.http.HttpServletResponse;
  * </pre>
  */
 @SlingServlet(generateComponent = true, generateService = true, selectors = { "cookie" }, extensions = { "json" }, resourceTypes = { "sakai/cluster-users" })
-@ServiceDocumentation(name = "ClusterUserServlet", okForVersion = "1.1",
+@ServiceDocumentation(name = "ClusterUserServlet", okForVersion = "1.2",
   shortDescription = "Translates the value of cookie SAKAI-TRACKING into a User object.",
   description = "Translates the value of cookie SAKAI-TRACKING into a User object. This REST end point is restricted to users that can read the resource "
   + "and optionally to requests that have embedded a shared trusted token in their request. It is presented with a user cookie, and responds with the "
@@ -314,7 +315,7 @@ public class LiteClusterUserServlet extends SlingSafeMethodsServlet {
             "Could not findAuthorizable");
       } else {
         JSONWriter jsonWriter = new JSONWriter(response.getWriter());
-        jsonWriter.setTidy(true);
+        jsonWriter.setTidy(ServletUtils.isTidy(request));
         jsonWriter.object();
         jsonWriter.key("server").value(serverId); // server
 

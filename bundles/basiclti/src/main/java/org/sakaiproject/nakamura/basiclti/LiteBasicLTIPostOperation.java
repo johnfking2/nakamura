@@ -18,6 +18,7 @@
 package org.sakaiproject.nakamura.basiclti;
 
 import static org.sakaiproject.nakamura.api.basiclti.BasicLTIAppConstants.LTI_ADMIN_NODE_NAME;
+import static org.sakaiproject.nakamura.api.basiclti.BasicLTIAppConstants.LTI_URL;
 import static org.sakaiproject.nakamura.api.basiclti.BasicLTIAppConstants.TOPIC_BASICLTI_ADDED;
 import static org.sakaiproject.nakamura.basiclti.LiteBasicLTIServletUtils.getInvalidUserPrivileges;
 import static org.sakaiproject.nakamura.basiclti.LiteBasicLTIServletUtils.isAdminUser;
@@ -35,11 +36,13 @@ import org.apache.sling.api.request.RequestParameter;
 import org.apache.sling.api.request.RequestParameterMap;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.servlets.HtmlResponse;
+import org.apache.sling.commons.json.JSONObject;
 import org.apache.sling.servlets.post.Modification;
 import org.osgi.service.event.EventAdmin;
 import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
 import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceParameter;
+import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
 import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.Session;
@@ -65,15 +68,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletResponse;
 
 @ServiceDocumentation(name = "Basic LTI Post Operation", okForVersion = "1.1",
   shortDescription = "Adds properties to a node for use with Basic LTI.",
@@ -85,6 +92,9 @@ import javax.servlet.ServletException;
       },
       description = {
         "Adds any provided properties to the node being posted to for use in BasicLTI integration. Properties ending with @Delete are removed."
+      }, 
+      response = { 
+        @ServiceResponse(code = HttpServletResponse.SC_PRECONDITION_FAILED, description = "IllegalArgumentException") 
       }
     )
   })
@@ -95,13 +105,16 @@ import javax.servlet.ServletException;
     @Property(name = "service.description", value = "Creates a sakai/basiclti settings node."),
     @Property(name = "service.vendor", value = "The Sakai Foundation") })
 public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
+  private static final String UTF_8 = "UTF-8";
+  private static final String BOOLEAN = "Boolean";
+  private static final String TYPE_HINT = "@TypeHint";
   private static final Logger LOG = LoggerFactory
       .getLogger(LiteBasicLTIPostOperation.class);
   /**
    * Dependency injected from OSGi container.
    */
   @Reference
-  private transient Repository repository;
+  protected transient Repository repository;
 
   @Reference
   protected transient EventAdmin eventAdmin;
@@ -112,6 +125,7 @@ public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
    * @see org.apache.sling.servlets.post.AbstractSlingPostOperation#doRun(org.apache.sling.api.SlingHttpServletRequest,
    *      org.apache.sling.api.servlets.HtmlResponse, java.util.List)
    */
+  @SuppressWarnings("deprecation")
   @Override
   protected void doRun(SlingHttpServletRequest request, HtmlResponse response,
       ContentManager contentManager, List<Modification> changes, String contentPath)
@@ -127,8 +141,10 @@ public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
     Content node = resource.adaptTo(Content.class);
     if (node == null) { // create the node
       if (resource instanceof SparseNonExistingResource) {
-        SparseNonExistingResource nonExistingResource = (SparseNonExistingResource) resource;
+        final SparseNonExistingResource nonExistingResource = (SparseNonExistingResource) resource;
         path = nonExistingResource.getTargetContentPath();
+      } else {
+        throw new IllegalStateException();
       }
       if (contentManager.exists(path)) {
         // I don't think we should end up here often if at all
@@ -140,41 +156,48 @@ public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
     try {
       final Map<String, String> sensitiveData = new HashMap<String, String>(
           sensitiveKeys.size());
-      // loop through request parameters
-      final RequestParameterMap requestParameterMap = request.getRequestParameterMap();
-      for (final Entry<String, RequestParameter[]> entry : requestParameterMap.entrySet()) {
-        final String key = entry.getKey();
-        if (key.endsWith("@TypeHint")) {
-          continue;
+      final String content = request.getParameter(":content");
+      if (content != null
+          && "json".equalsIgnoreCase(request.getParameter(":contentType"))) {
+        // SAKIII-5295 use ImportOperation semantics (argh!)
+        final JSONObject json = new JSONObject(content);
+        final Iterator<String> keys = json.keys();
+        // loop through content parameters
+        while (keys.hasNext()) {
+          final String key = keys.next();
+          // ignore TypeHints for now; will be consulted later
+          if (key.endsWith(TYPE_HINT)) {
+            continue;
+          }
+          final String value = json.getString(key);
+          final String typeHint = key + TYPE_HINT;
+          final boolean isBoolean = (json.has(typeHint) && BOOLEAN.equals(json
+              .getString(typeHint)));
+          mutateProperties(node, key, value, isBoolean, sensitiveData);
         }
-        final RequestParameter[] requestParameterArray = entry.getValue();
-        if (requestParameterArray != null && requestParameterArray.length != 0) {
-          if (requestParameterArray.length > 1) {
-            throw new ServletException("Multi-valued parameters are not supported");
-          } else {
-            final String value = requestParameterArray[0].getString("UTF-8");
-            if ("".equals(value)) {
-              removeProperty(node, key);
-            } else { // has a valid value
-              if (sensitiveKeys.contains(key)) {
-                sensitiveData.put(key, value);
-              } else {
-                if (!unsupportedKeys.contains(key)) {
-                  final String typeHint = key + "@TypeHint";
-                  if (requestParameterMap.containsKey(typeHint)
-                      && "Boolean".equals(requestParameterMap.get(typeHint)[0]
-                          .getString())) {
-                    node.setProperty(key,
-                        Boolean.valueOf(value));
-                  } else {
-                    node.setProperty(key, value);
-                  }
-                }
-              }
+      } else {
+        // loop through request parameters
+        final RequestParameterMap requestParameterMap = request.getRequestParameterMap();
+        for (final Entry<String, RequestParameter[]> entry : requestParameterMap
+            .entrySet()) {
+          final String key = entry.getKey();
+          if (key.endsWith(TYPE_HINT)) {
+            continue;
+          }
+          final RequestParameter[] requestParameterArray = entry.getValue();
+          if (requestParameterArray != null && requestParameterArray.length != 0) {
+            if (requestParameterArray.length > 1) {
+              throw new ServletException("Multi-valued parameters are not supported");
+            } else {
+              final String value = requestParameterArray[0].getString(UTF_8);
+              final String typeHint = key + TYPE_HINT;
+              final boolean isBoolean = (requestParameterMap.containsKey(typeHint) && BOOLEAN
+                  .equals(requestParameterMap.get(typeHint)[0].getString(UTF_8)));
+              mutateProperties(node, key, value, isBoolean, sensitiveData);
             }
           }
-        }
-      } // end request parameters loop
+        } // end request parameters loop
+      }
       // safety precaution - just to be safe
       for (String skey : sensitiveKeys) {
         removeProperty(node, skey);
@@ -186,12 +209,59 @@ public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
       Dictionary<String, String> properties = new Hashtable<String, String>();
       properties.put(UserConstants.EVENT_PROP_USERID, request.getRemoteUser());
       EventUtils.sendOsgiEvent(properties, TOPIC_BASICLTI_ADDED, eventAdmin);
+    } catch (IllegalArgumentException iae) {
+      LOG.debug(iae.getLocalizedMessage(), iae);
+      response.setStatus(HttpServletResponse.SC_PRECONDITION_FAILED,
+          iae.getLocalizedMessage());
     } catch (Throwable e) {
       throw new StorageClientException(contentPath, e);
     }
   }
 
-  private void createSensitiveNode(final Content parent, final Session userSession,
+  /**
+   * Sets the properties on a node to the appropriate values from a POST or import.
+   * 
+   * @param node
+   *          The node to mutate
+   * @param key
+   * @param value
+   * @param isBoolean
+   *          Is the value of type Boolean?
+   * @param sensitiveData
+   *          Add any sensitive data that is found to this map.
+   * @throws IllegalArgumentException
+   */
+  protected void mutateProperties(final Content node, final String key,
+      final String value, final boolean isBoolean, final Map<String, String> sensitiveData)
+      throws IllegalArgumentException {
+    if (value == null || "".equals(value)) {
+      removeProperty(node, key);
+    } else { // has a valid value
+      if (sensitiveKeys.contains(key)) {
+        sensitiveData.put(key, value);
+      } else {
+        if (!unsupportedKeys.contains(key)) {
+          if (isBoolean) {
+            node.setProperty(key, Boolean.valueOf(value));
+          } else {
+            // validate inputs
+            if (LTI_URL.equals(key)) {
+              try {
+                new URL(value);
+              } catch (MalformedURLException e) {
+                LOG.debug(e.getLocalizedMessage(), e);
+                throw new IllegalArgumentException(e);
+              }
+            }
+            // persist properties
+            node.setProperty(key, value);
+          }
+        }
+      }
+    }
+  }
+
+  protected void createSensitiveNode(final Content parent, final Session userSession,
       Map<String, String> sensitiveData) {
     if (parent == null) {
       throw new IllegalArgumentException("Node parent==null");
@@ -212,19 +282,16 @@ public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
     Session adminSession = null;
     try {
       adminSession = repository.loginAdministrative();
-      final Content adminNode = new Content(adminNodePath, new HashMap<String, Object>());
-      // final Content adminNode = JcrUtils.deepGetOrCreateNode(adminSession,
-      // adminNodePath);
-      for (final Entry<String, String> entry : sensitiveData.entrySet()) {
-        adminNode.setProperty(entry.getKey(),
-            entry.getValue());
+      if (adminSession != null) {
+        final Content adminNode = new Content(adminNodePath,
+            new HashMap<String, Object>());
+        for (final Entry<String, String> entry : sensitiveData.entrySet()) {
+          adminNode.setProperty(entry.getKey(), entry.getValue());
+        }
+        adminSession.getContentManager().update(adminNode);
+        // ensure only admins can read the node
+        accessControlSensitiveNode(adminNodePath, adminSession, userSession.getUserId());
       }
-      adminSession.getContentManager().update(adminNode);
-      // ensure only admins can read the node
-      accessControlSensitiveNode(adminNodePath, adminSession, userSession.getUserId());
-      // if (adminSession.hasPendingChanges()) {
-      // adminSession.save();
-      // }
     } catch (AccessDeniedException e) {
       LOG.error(e.getLocalizedMessage(), e);
       throw new IllegalStateException(e);
@@ -246,10 +313,11 @@ public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
     if (!isAdminUser(userSession)) { // i.e. normal user
       try {
         final AccessControlManager acm = userSession.getAccessControlManager();
-        Permission[] userPrivs = acm.getPermissions(Security.ZONE_CONTENT, adminNodePath);
+        final Permission[] userPrivs = acm.getPermissions(Security.ZONE_CONTENT,
+            adminNodePath);
         if (userPrivs != null && userPrivs.length > 0) {
-          Set<Permission> invalidUserPrivileges = getInvalidUserPrivileges(acm);
-          for (Permission privilege : userPrivs) {
+          final Set<Permission> invalidUserPrivileges = getInvalidUserPrivileges();
+          for (final Permission privilege : userPrivs) {
             if (invalidUserPrivileges.contains(privilege)) {
               invalidPrivileges = true;
               break;
@@ -277,9 +345,9 @@ public class LiteBasicLTIPostOperation extends AbstractSparsePostOperation {
    * @throws StorageClientException
    * @throws AccessDeniedException
    */
-  private void accessControlSensitiveNode(final String sensitiveNodePath,
-      final Session adminSession, String currentUserId) throws StorageClientException,
-      AccessDeniedException {
+  protected void accessControlSensitiveNode(final String sensitiveNodePath,
+      final Session adminSession, final String currentUserId)
+      throws StorageClientException, AccessDeniedException {
 
     adminSession.getAccessControlManager().setAcl(
         Security.ZONE_CONTENT,

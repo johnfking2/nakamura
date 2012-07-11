@@ -82,7 +82,7 @@ import javax.jcr.ValueFormatException;
  */
 public class DiskProcessorTest {
 
-  public static final String TEST_STRING = "K2 docProxy test resource";
+  public static final String TEST_STRING = "Nakamura docProxy test resource";
   private DiskProcessor diskProcessor;
   private String currPath;
   private MockNode proxyNode;
@@ -112,7 +112,7 @@ public class DiskProcessorTest {
         locationProp);
     replay(locationProp, proxyNode);
     ExternalDocumentResult result = diskProcessor.getDocument(proxyNode, "README");
-    InputStream in = result.getDocumentInputStream(0, "zach");
+    InputStream in = result.getDocumentInputStream("zach");
     String content = IOUtils.readFully(in, "UTF-8");
     Assert.assertEquals(TEST_STRING, content);
 
@@ -132,7 +132,7 @@ public class DiskProcessorTest {
 
     // Get the file
     ExternalDocumentResult result = diskProcessor.getDocument(newNode, path);
-    InputStream in = result.getDocumentInputStream(0, "zach");
+    InputStream in = result.getDocumentInputStream("zach");
 
     // Read content
     String content = IOUtils.readFully(in, "UTF-8");

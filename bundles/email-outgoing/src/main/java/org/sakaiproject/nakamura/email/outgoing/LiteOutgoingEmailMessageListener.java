@@ -27,6 +27,7 @@ import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Modified;
 import org.apache.felix.scr.annotations.Property;
+import org.apache.felix.scr.annotations.PropertyOption;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.sling.commons.osgi.PropertiesUtil;
 import org.apache.sling.commons.scheduler.Job;
@@ -52,10 +53,12 @@ import org.sakaiproject.nakamura.api.user.BasicUserInfoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FilterOutputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -74,37 +77,66 @@ import javax.jms.MessageConsumer;
 import javax.jms.MessageListener;
 import javax.jms.Queue;
 import javax.jms.Session;
+import javax.mail.MessagingException;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 
 @Component(immediate = true, metatype = true)
 public class LiteOutgoingEmailMessageListener implements MessageListener {
   private static final Logger LOGGER = LoggerFactory
       .getLogger(LiteOutgoingEmailMessageListener.class);
 
+  /**
+   * Value to set operation mode to 'send'. Messages are sent out via smtp. This is the
+   * default working mode.
+   */
+  static final String OP_SEND = "send";
+  /**
+   * Value to set operation mode to 'log'. Messages are logged but not sent.
+   */
+  static final String OP_LOG = "log";
+  /**
+   * Value to set operation mode to 'noop'. Messages are not logged nor sent out; a basic
+   * log entry is recorded for each attempt to send.
+   */
+  static final String OP_NOOP = "noop";
+  /**
+   * Value to set operation mode to 'disabled'. Service does not listen for JMS messages
+   * at all and logging does not happen on each send request.
+   */
+  static final String OP_DISABLED = "disabled";
 
   @Property(value = "localhost")
-  private static final String SMTP_SERVER = "sakai.smtp.server";
+  static final String SMTP_SERVER = "sakai.smtp.server";
   @Property(intValue = 25)
-  private static final String SMTP_PORT = "sakai.smtp.port";
+  static final String SMTP_PORT = "sakai.smtp.port";
   @Property(boolValue = false)
-  private static final String SMTP_USE_TLS = "sakai.smtp.tls";
+  static final String SMTP_USE_TLS = "sakai.smtp.tls";
   @Property(boolValue = false)
-  private static final String SMTP_USE_SSL = "sakai.smtp.ssl";
+  static final String SMTP_USE_SSL = "sakai.smtp.ssl";
   @Property
-  private static final String SMTP_AUTH_USER = "sakai.smtp.auth.user";
+  static final String SMTP_AUTH_USER = "sakai.smtp.auth.user";
   @Property
-  private static final String SMTP_AUTH_PASS = "sakai.smtp.auth.pass";
+  static final String SMTP_AUTH_PASS = "sakai.smtp.auth.pass";
   @Property(intValue = 240)
-  private static final String MAX_RETRIES = "sakai.email.maxRetries";
+  static final String MAX_RETRIES = "sakai.email.maxRetries";
   @Property(intValue = 30)
-  private static final String RETRY_INTERVAL = "sakai.email.retryIntervalMinutes";
+  static final String RETRY_INTERVAL = "sakai.email.retryIntervalMinutes";
   @Property(value = "no-reply@example.com")
-  private static final String REPLY_AS_ADDRESS = "sakai.email.replyAsAddress";
+  static final String REPLY_AS_ADDRESS = "sakai.email.replyAsAddress";
   @Property(value = "Sakai OAE")
-  private static final String REPLY_AS_NAME = "sakai.email.replyAsName";
+  static final String REPLY_AS_NAME = "sakai.email.replyAsName";
+  @Property(options = {
+      @PropertyOption(name = OP_SEND, value = "Send"),
+      @PropertyOption(name = OP_LOG, value = "Log"),
+      @PropertyOption(name = OP_NOOP, value = "Noop"),
+      @PropertyOption(name = OP_DISABLED, value = "Disabled")
+  })
+  static final String OPERATION_MODE = "sakai.email.operation.mode";
 
-  protected static final String QUEUE_NAME = "org/sakaiproject/nakamura/message/email/outgoing";
+  static final String QUEUE_NAME = "org/sakaiproject/nakamura/message/email/outgoing";
+  
 
   @Reference
   protected SlingRepository repository;
@@ -132,6 +164,11 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
 
   public static final String RECIPIENTS = "recipients";
 
+  /**
+   * String template for required but not-set service properties.
+   */
+  private static final String NOT_SET_TMPL = "%s not set";
+
   private Connection connection = null;
   private String smtpServer;
   private Integer smtpPort;
@@ -143,7 +180,7 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
   private Integer retryInterval;
   private String replyAsAddress;
   private String replyAsName;
-
+  private String operationMode;
 
   public LiteOutgoingEmailMessageListener() {
   }
@@ -154,6 +191,11 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
 
   @SuppressWarnings("unchecked")
   public void onMessage(Message message) {
+    // only have to check for 'noop' since 'disabled' doesn't listen on JMS
+    if (OP_NOOP.equals(operationMode)) {
+      LOGGER.info("Emailing sending is not enabled [noop].");
+      return;
+    }
     try {
       LOGGER.debug("Started handling email jms message.");
 
@@ -185,8 +227,7 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
             // validate the message
             if (messageContent != null) {
               if (messageContent.hasProperty(MessageConstants.PROP_SAKAI_MESSAGEBOX)
-                  && (MessageConstants.BOX_OUTBOX.equals(messageContent
-                      .getProperty(MessageConstants.PROP_SAKAI_MESSAGEBOX)) 
+                  && (MessageConstants.BOX_OUTBOX.equals(messageContent.getProperty(MessageConstants.PROP_SAKAI_MESSAGEBOX))
                       || MessageConstants.BOX_PENDING.equals(messageContent.getProperty(MessageConstants.PROP_SAKAI_MESSAGEBOX)))) {
                 if (messageContent.hasProperty(MessageConstants.PROP_SAKAI_MESSAGEERROR)) {
                   // We're retrying this message, so clear the errors
@@ -202,14 +243,24 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
                         sparseSession);
 
                     setOptions(email);
-
-                    email.send();
+                    if (LOGGER.isDebugEnabled() || OP_LOG.equals(operationMode)) {
+                      // build wrapped message in order to log it
+                      email.buildMimeMessage();
+                      logEmail(email);
+                    }
+                    if (OP_SEND.equals(operationMode)) {
+                      email.send();
+                    } else {
+                      LOGGER.info("Email sending is not enabled [{}]", operationMode);
+                    }
                   } catch (EmailException e) {
+                    // noop & disabled will never reach here. We continue to let log &
+                    // send trigger rescheduling
                     String exMessage = e.getMessage();
                     Throwable cause = e.getCause();
 
                     setError(messageContent, exMessage);
-                    LOGGER.warn("Unable to send email: " + exMessage);
+                    LOGGER.warn("Exception building/sending email: " + exMessage);
 
                     // Get the SMTP error code
                     // There has to be a better way to do this
@@ -234,15 +285,20 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
                           scheduleRetry(errorCode, messageContent);
                           rescheduled = true;
                         }
+                        else if (!rescheduled && cause.toString().contains("java.net.ConnectException")){
+                          scheduleRetry(messageContent);
+                          rescheduled = true;
+                        }
                       }
                     }
+
                     if (rescheduled) {
                       LOGGER.info("Email {} rescheduled for redelivery. ", nodePath);
                     } else {
                       LOGGER
-                          .error(
-                              "Unable to reschedule email for delivery: "
-                                  + e.getMessage(), e);
+                      .error(
+                          "Unable to reschedule email for delivery: "
+                              + e.getMessage(), e);
                     }
                   }
                 } else {
@@ -304,10 +360,10 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
     }
   }
 
-  private MultiPartEmail constructMessage(Content contentNode, List<String> recipients,
+  protected MultiPartEmail constructMessage(Content contentNode, List<String> recipients,
       javax.jcr.Session session, org.sakaiproject.nakamura.api.lite.Session sparseSession)
       throws EmailDeliveryException, StorageClientException, AccessDeniedException,
-      PathNotFoundException, RepositoryException {
+      PathNotFoundException, RepositoryException, EmailException {
     MultiPartEmail email = new MultiPartEmail();
 
 
@@ -362,10 +418,10 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
           .debug("Checking for sakai:templatePath and sakai:templateParams properties on the outgoing message's node.");
       if (contentNode.hasProperty(MessageConstants.PROP_TEMPLATE_PATH)
           && contentNode.hasProperty(MessageConstants.PROP_TEMPLATE_PARAMS)) {
-        Map<String, String> parameters = getTemplateProperties((String) contentNode
-            .getProperty(MessageConstants.PROP_TEMPLATE_PARAMS));
-        String templatePath = (String) contentNode
-            .getProperty(MessageConstants.PROP_TEMPLATE_PATH);
+        Map<String, String> parameters = getTemplateProperties(contentNode
+            .getProperty(MessageConstants.PROP_TEMPLATE_PARAMS).toString());
+        String templatePath = contentNode
+            .getProperty(MessageConstants.PROP_TEMPLATE_PATH).toString();
         LOGGER.debug("Got the path '{0}' to the template for this outgoing message.",
             templatePath);
         Node templateNode = session.getNode(templatePath);
@@ -391,8 +447,8 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
     }
 
     if (contentNode.hasProperty(MessageConstants.PROP_SAKAI_SUBJECT)) {
-      email.setSubject((String) contentNode
-          .getProperty(MessageConstants.PROP_SAKAI_SUBJECT));
+      email.setSubject(contentNode
+          .getProperty(MessageConstants.PROP_SAKAI_SUBJECT).toString());
     }
 
     ContentManager contentManager = sparseSession.getContentManager();
@@ -400,8 +456,8 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
       String description = null;
       if (contentNode.hasProperty(StorageClientUtils.getAltField(
           MessageConstants.PROP_SAKAI_ATTACHMENT_DESCRIPTION, streamId))) {
-        description = (String) contentNode.getProperty(StorageClientUtils.getAltField(
-            MessageConstants.PROP_SAKAI_ATTACHMENT_DESCRIPTION, streamId));
+        description = contentNode.getProperty(StorageClientUtils.getAltField(
+            MessageConstants.PROP_SAKAI_ATTACHMENT_DESCRIPTION, streamId)).toString();
       }
       LiteEmailDataSource ds = new LiteEmailDataSource(contentManager, contentNode,
           streamId);
@@ -476,61 +532,63 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
     return address;
   }
 
-  private void scheduleRetry(int errorCode, Content contentNode) {
+  protected void scheduleRetry(int errorCode, Content contentNode) {
     // All retry-able SMTP errors should have codes starting with 4
     if ((errorCode / 100) == 4) {
-      long retryCount = 0;
-      if (contentNode.hasProperty(MessageConstants.PROP_SAKAI_RETRY_COUNT)) {
-        retryCount = StorageClientUtils.toLong(contentNode
-            .getProperty(MessageConstants.PROP_SAKAI_RETRY_COUNT));
-      }
-
-      if (retryCount < maxRetries) {
-        Job job = new Job() {
-
-          public void execute(JobContext jc) {
-            Map<String, Serializable> config = jc.getConfiguration();
-            Properties eventProps = new Properties();
-            eventProps.put(NODE_PATH_PROPERTY, config.get(NODE_PATH_PROPERTY));
-
-            Event retryEvent = new Event(QUEUE_NAME, (Map<Object, Object>) eventProps);
-            eventAdmin.postEvent(retryEvent);
-
-          }
-        };
-
-        HashMap<String, Serializable> jobConfig = new HashMap<String, Serializable>();
-        jobConfig.put(NODE_PATH_PROPERTY, contentNode.getPath());
-
-        int retryIntervalMillis = retryInterval * 60000;
-        Date nextTry = new Date(System.currentTimeMillis() + (retryIntervalMillis));
-
-        try {
-          scheduler.fireJobAt(null, job, jobConfig, nextTry);
-        } catch (Exception e) {
-          LOGGER.error(e.getMessage(), e);
-        }
-      } else {
-        setError(contentNode, "Unable to send message, exhausted SMTP retries.");
-      }
+      scheduleRetry(contentNode);
     } else {
       LOGGER.warn("Not scheduling a retry for error code not of the form 4xx.");
     }
   }
 
+  protected void scheduleRetry(Content contentNode) {
+
+    long retryCount = 0;
+    if (contentNode.hasProperty(MessageConstants.PROP_SAKAI_RETRY_COUNT)) {
+      retryCount = StorageClientUtils.toLong(contentNode
+          .getProperty(MessageConstants.PROP_SAKAI_RETRY_COUNT));
+    }
+
+    if (retryCount < maxRetries) {
+      Job job = new Job() {
+
+        public void execute(JobContext jc) {
+          Map<String, Serializable> config = jc.getConfiguration();
+          Properties eventProps = new Properties();
+          eventProps.put(NODE_PATH_PROPERTY, config.get(NODE_PATH_PROPERTY));
+
+          Event retryEvent = new Event(QUEUE_NAME, (Map<Object, Object>) eventProps);
+          eventAdmin.postEvent(retryEvent);
+
+        }
+      };
+
+      HashMap<String, Serializable> jobConfig = new HashMap<String, Serializable>();
+      jobConfig.put(NODE_PATH_PROPERTY, contentNode.getPath());
+
+      int retryIntervalMillis = retryInterval * 60000;
+      Date nextTry = new Date(System.currentTimeMillis() + (retryIntervalMillis));
+
+      try {
+        scheduler.fireJobAt(null, job, jobConfig, nextTry);
+      } catch (Exception e) {
+        LOGGER.error(e.getMessage(), e);
+      }
+    } else {
+      setError(contentNode, "Unable to send message, exhausted SMTP retries.");
+    }
+  }
+
   @Activate
   @Modified
-  protected void activate(ComponentContext ctx) {
-    @SuppressWarnings("rawtypes")
-    Dictionary props = ctx.getProperties();
-
+  protected void activate(Map<?, ?> props) throws JMSException {
     Integer _maxRetries = PropertiesUtil.toInteger(props.get(MAX_RETRIES), -1);
     if (_maxRetries > -1 ) {
       if (diff(maxRetries, _maxRetries)) {
         maxRetries = _maxRetries;
       }
     } else {
-      LOGGER.error("Maximum times to retry messages not set.");
+      throw new IllegalArgumentException(String.format(NOT_SET_TMPL, MAX_RETRIES));
     }
 
     Integer _retryInterval = PropertiesUtil.toInteger(props.get(RETRY_INTERVAL), -1);
@@ -539,7 +597,7 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
         retryInterval = _retryInterval;
       }
     } else {
-      LOGGER.error("SMTP retry interval not set.");
+      throw new IllegalArgumentException(String.format(NOT_SET_TMPL, RETRY_INTERVAL));
     }
 
     if (maxRetries * retryInterval < 4320 /* minutes in 3 days */) {
@@ -553,7 +611,7 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
         smtpPort = _smtpPort;
       }
     } else {
-      LOGGER.error("Invalid port set for SMTP");
+      throw new IllegalArgumentException("Invalid port set for SMTP");
     }
 
     String _smtpServer = PropertiesUtil.toString(props.get(SMTP_SERVER), "");
@@ -562,7 +620,7 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
         smtpServer = _smtpServer;
       }
     } else {
-      LOGGER.error("No SMTP server set");
+      throw new IllegalArgumentException(String.format(NOT_SET_TMPL, SMTP_SERVER));
     }
 
     String _replyAsAddress = PropertiesUtil.toString(props.get(REPLY_AS_ADDRESS), "");
@@ -571,7 +629,7 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
         replyAsAddress = _replyAsAddress;
       }
     } else {
-      LOGGER.error("No reply-as email address set");
+      throw new IllegalArgumentException(String.format(NOT_SET_TMPL, REPLY_AS_ADDRESS));
     }
 
     String _replyAsName = PropertiesUtil.toString(props.get(REPLY_AS_NAME), "");
@@ -580,13 +638,19 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
         replyAsName = _replyAsName;
       }
     } else {
-      LOGGER.error("No reply-as email name set");
+      throw new IllegalArgumentException(String.format(NOT_SET_TMPL, REPLY_AS_NAME));
     }
 
     useTls = PropertiesUtil.toBoolean(props.get(SMTP_USE_TLS), false);
     useSsl = PropertiesUtil.toBoolean(props.get(SMTP_USE_SSL), false);
     authUser = PropertiesUtil.toString(props.get(SMTP_AUTH_USER), "");
     authPass = PropertiesUtil.toString(props.get(SMTP_AUTH_PASS), "");
+
+    operationMode = PropertiesUtil.toString(props.get(OPERATION_MODE), OP_SEND);
+    if (OP_DISABLED.equals(operationMode)) {
+      LOGGER.info("Email sending is completely disabled and not connected to JMS. Set to 'noop' to see a log entry per message send request.");
+      return;
+    }
 
     try {
       connection = connFactoryService.getDefaultConnectionFactory().createConnection();
@@ -603,6 +667,7 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
         } catch (JMSException e1) {
         }
       }
+      throw e;
     }
   }
 
@@ -638,6 +703,27 @@ public class LiteOutgoingEmailMessageListener implements MessageListener {
       diff = false;
     }
     return diff;
+  }
+  
+  private void logEmail(MultiPartEmail multiPartMessage) {
+    if (multiPartMessage != null) {
+      MimeMessage mimeMessage = multiPartMessage.getMimeMessage();
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      try {
+        mimeMessage.writeTo(new FilterOutputStream(baos));
+        if (OP_LOG.equals(operationMode)) {
+          LOGGER.info("Email content = \n" + baos.toString());
+        } else {
+          LOGGER.debug("Email content = \n" + baos.toString());
+        }
+      } catch (IOException e) {
+        LOGGER.error("failed to log email", e);
+      } catch (MessagingException e) {
+        LOGGER.error("failed to log email", e);
+      }      
+    } else {
+      LOGGER.error("Email is null");
+    }
   }
 
 }

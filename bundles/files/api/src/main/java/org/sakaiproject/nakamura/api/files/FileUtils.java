@@ -22,7 +22,9 @@ import static org.sakaiproject.nakamura.api.files.FilesConstants.RT_SAKAI_LINK;
 import static org.sakaiproject.nakamura.api.files.FilesConstants.SAKAI_LINK;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 
+import org.apache.felix.scr.annotations.Reference;
 import org.apache.jackrabbit.JcrConstants;
 import org.apache.sling.api.resource.Resource;
 import org.apache.sling.api.resource.ResourceResolver;
@@ -30,6 +32,7 @@ import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.io.JSONWriter;
 import org.apache.sling.jcr.api.SlingRepository;
 import org.apache.sling.jcr.resource.JcrResourceConstants;
+import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessControlManager;
@@ -130,7 +133,7 @@ public class FileUtils {
       }
     }
     linkNode
-        .setProperty(JcrResourceConstants.SLING_RESOURCE_TYPE_PROPERTY, RT_SAKAI_LINK);
+    .setProperty(JcrResourceConstants.SLING_RESOURCE_TYPE_PROPERTY, RT_SAKAI_LINK);
     linkNode.setProperty(SAKAI_LINK, fileNode.getIdentifier());
 
     // Save link.
@@ -181,7 +184,7 @@ public class FileUtils {
 
   public static void writeFileNode(Content content,
       org.sakaiproject.nakamura.api.lite.Session session, JSONWriter write)
-      throws JSONException, StorageClientException {
+          throws JSONException, StorageClientException {
     writeFileNode(content, session, write, 0);
   }
 
@@ -226,19 +229,27 @@ public class FileUtils {
 
   public static void writeFileNode(Content content,
       org.sakaiproject.nakamura.api.lite.Session session, JSONWriter write, int maxDepth)
-      throws JSONException, StorageClientException {
+          throws JSONException, StorageClientException {
+
+    writeFileNode(content, session, write, maxDepth, false);
+  }
+
+  public static void writeFileNode(Content content,
+      org.sakaiproject.nakamura.api.lite.Session session, JSONWriter write, int maxDepth, boolean objectInProgress)
+          throws JSONException, StorageClientException {
     if (content == null) {
       log.warn("Can't output null content.");
       return;
     }
 
-    write.object();
-
+    if (!objectInProgress){
+      write.object();
+    }
     // dump all the properties.
     ExtendedJSONWriter.writeContentTreeToWriter(write, content, true, maxDepth);
     // The permissions for this session.
     writePermissions(content, session, write);
-
+    
     write.key(JcrConstants.JCR_LASTMODIFIED);
     Calendar cal = new GregorianCalendar();
     cal.setTimeInMillis(StorageClientUtils.toLong(content.getProperty(Content.LASTMODIFIED_FIELD)));
@@ -247,7 +258,9 @@ public class FileUtils {
     write.value(content.getProperty(Content.MIMETYPE_FIELD));
     write.key(JcrConstants.JCR_DATA);
     write.value(StorageClientUtils.toLong(content.getProperty(Content.LENGTH_FIELD)));
-    write.endObject();
+    if (!objectInProgress){
+      write.endObject();
+    }
   }
 
   /**
@@ -282,11 +295,13 @@ public class FileUtils {
   }
 
   public static void writeLinkNode(Content content,
-      org.sakaiproject.nakamura.api.lite.Session session, JSONWriter writer)
-      throws StorageClientException, JSONException {
-    ContentManager contentManager = session.getContentManager();
+      org.sakaiproject.nakamura.api.lite.Session session, JSONWriter writer, boolean objectInProgress)
+          throws StorageClientException, JSONException {
 
-    writer.object();
+    if (!objectInProgress){
+      writer.object();
+    }
+    ContentManager contentManager = session.getContentManager();
 
     // Write all the properties.
     ExtendedJSONWriter.writeNodeContentsToWriter(writer, content);
@@ -305,8 +320,93 @@ public class FileUtils {
         writer.value(false);
       }
     }
+    if (!objectInProgress){
+      writer.endObject();
+    }
+  }
 
-    writer.endObject();
+  public static void writeLinkNode(Content content,
+      org.sakaiproject.nakamura.api.lite.Session session, JSONWriter writer)
+          throws StorageClientException, JSONException {
+
+    writeLinkNode(content, session, writer, false);
+  }
+ 
+  /**
+   * Writes commentCount of content
+   *
+   * @param node
+   * @param session
+   * @param write
+   * @throws RepositoryException
+   * @throws JSONException
+   */
+  public static void writeCommentCountProperty(Content content,
+      org.sakaiproject.nakamura.api.lite.Session session, JSONWriter writer, Repository repository) 
+          throws StorageClientException, JSONException {
+
+    int commentCount = 0;
+    String COMMENTCOUNT = "commentCount";
+
+    if(content.hasProperty(COMMENTCOUNT)){
+      commentCount = (Integer)content.getProperty(COMMENTCOUNT);
+    } else {
+      // no commentCount property on Content, then evaluate count and add property
+      Content comments = null;
+      org.sakaiproject.nakamura.api.lite.Session adminSession = null;
+      try {
+        comments = session.getContentManager().get(content.getPath() + "/comments");
+        if (comments!=null){
+          commentCount = Iterables.size(comments.listChildPaths());
+        }
+        content.setProperty(COMMENTCOUNT, commentCount);
+        //save property
+        adminSession = repository.loginAdministrative();
+        ContentManager adminContentManager = adminSession.getContentManager();
+        adminContentManager.update(content);
+      } catch (org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException e) {
+        log.error(e.getMessage(), e);
+      } finally {
+        if (adminSession != null) {
+          try {
+            adminSession.logout();
+          } catch (Exception e) {
+            log.error("Could not logout administrative session.");
+          }
+        }
+      }
+    }
+    writer.key(COMMENTCOUNT);
+    writer.value(commentCount);
+  }
+
+  /**
+   * Writes comments of content
+   *
+   * @param node
+   * @param session
+   * @param write
+   * @throws RepositoryException
+   * @throws JSONException
+   */
+  public static void writeComments(Content content,
+      org.sakaiproject.nakamura.api.lite.Session session, JSONWriter writer)
+          throws StorageClientException, JSONException {
+    if (content == null) {
+      log.warn("Can't output comments of null content.");
+      return;
+    }
+    writer.key("comments");
+    writer.object();
+    Content commentContent = null;
+    try {
+      commentContent = session.getContentManager().get(content.getPath() + "/comments");
+      ExtendedJSONWriter.writeContentTreeToWriter(writer, commentContent, true, 2); 
+    } catch (org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException e) {
+      writer.value(false);
+    } finally {
+      writer.endObject();
+    }
   }
 
   /**
@@ -334,7 +434,7 @@ public class FileUtils {
 
   private static void writePermissions(Content content,
       org.sakaiproject.nakamura.api.lite.Session session, JSONWriter writer)
-      throws StorageClientException, JSONException {
+          throws StorageClientException, JSONException {
     if (content == null) {
       log.warn("Can't output permissions of null content.");
       return;

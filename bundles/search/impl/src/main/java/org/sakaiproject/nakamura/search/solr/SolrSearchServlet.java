@@ -30,12 +30,10 @@ import static org.sakaiproject.nakamura.api.search.solr.SolrSearchConstants.SAKA
 import static org.sakaiproject.nakamura.api.search.solr.SolrSearchConstants.SAKAI_RESULTPROCESSOR;
 import static org.sakaiproject.nakamura.api.search.solr.SolrSearchConstants.SAKAI_SEARCHRESPONSEDECORATOR;
 import static org.sakaiproject.nakamura.api.search.solr.SolrSearchConstants.SEARCH_PATH_PREFIX;
-import static org.sakaiproject.nakamura.api.search.solr.SolrSearchConstants.TIDY;
 import static org.sakaiproject.nakamura.api.search.solr.SolrSearchConstants.TOTAL;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.felix.scr.annotations.Properties;
 import org.apache.felix.scr.annotations.Property;
@@ -70,6 +68,8 @@ import org.sakaiproject.nakamura.api.templates.TemplateService;
 import org.sakaiproject.nakamura.util.ExtendedJSONWriter;
 import org.sakaiproject.nakamura.util.JcrUtils;
 import org.sakaiproject.nakamura.util.LitePersonalUtils;
+import org.sakaiproject.nakamura.util.ServletUtils;
+import org.sakaiproject.nakamura.util.telemetry.TelemetryCounter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +81,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import javax.jcr.Node;
 import javax.jcr.PropertyIterator;
 import javax.jcr.RepositoryException;
@@ -89,7 +88,7 @@ import javax.jcr.Value;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
 
-@ServiceDocumentation(name = "Solr Search Servlet", okForVersion = "1.1",
+@ServiceDocumentation(name = "Solr Search Servlet", okForVersion = "1.2",
   shortDescription = "The Search servlet provides search results from a search template.",
   description = {
     "The Solr Search Servlet responds with search results in json form in response to GETs on search urls. Those URLs are resolved "
@@ -188,7 +187,6 @@ public class SolrSearchServlet extends SlingSafeMethodsServlet {
                 + SEARCH_PATH_PREFIX);
         return;
       }
-
       Node node = resource.adaptTo(Node.class);
       if (node != null && node.hasProperty(SAKAI_QUERY_TEMPLATE)) {
         // KERN-1147 Respond better when all parameters haven't been provided for a query
@@ -196,6 +194,9 @@ public class SolrSearchServlet extends SlingSafeMethodsServlet {
         try {
           query = processQuery(request, node);
         } catch (MissingParameterException e) {
+          response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+          return;
+        } catch (IllegalArgumentException e) {
           response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
           return;
         }
@@ -258,7 +259,7 @@ public class SolrSearchServlet extends SlingSafeMethodsServlet {
         response.setCharacterEncoding("UTF-8");
 
         ExtendedJSONWriter write = new ExtendedJSONWriter(response.getWriter());
-        write.setTidy(isTidy(request));
+        write.setTidy(ServletUtils.isTidy(request));
 
         write.object();
         write.key(PARAMS_ITEMS_PER_PAGE);
@@ -519,19 +520,6 @@ public class SolrSearchServlet extends SlingSafeMethodsServlet {
     }
 
     return propertiesMap;
-  }
-
-  /**
-   * True if our request wants the "tidy" pretty-printed format Copied from
-   * org.apache.sling.servlets.get.impl.helpers.JsonRendererServlet
-   */
-  protected boolean isTidy(SlingHttpServletRequest req) {
-    for (String selector : req.getRequestPathInfo().getSelectors()) {
-      if (TIDY.equals(selector)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private String[] getStringArrayProp(Node queryNode, String propName) throws RepositoryException {

@@ -142,7 +142,7 @@ public class RestAuthenticationHandlerTest {
   public void dropCredentialsWithLogoutUrl() throws IOException {
     ssoAuthenticationHandler.dropCredentials(request, response);
 
-    verify(request).setAttribute(Authenticator.LOGIN_RESOURCE, "http://localhost/sso/UI/Logout");
+    verify(response).sendRedirect("http://localhost/sso/UI/Logout");
   }
 
   @Test
@@ -151,7 +151,7 @@ public class RestAuthenticationHandlerTest {
 
     ssoAuthenticationHandler.dropCredentials(request, response);
 
-    verify(request).setAttribute(Authenticator.LOGIN_RESOURCE, "http://localhost/sso/UI/Logout");
+    verify(response).sendRedirect("http://localhost/sso/UI/Logout");
   }
 
   @Test
@@ -272,7 +272,7 @@ public class RestAuthenticationHandlerTest {
         response, authenticationInfo);
     assertFalse(actionTaken);
     verify(postProcessService).process(any(Authorizable.class), any(Session.class),
-        any(ModificationType.class), any(SlingHttpServletRequest.class));
+        any(ModificationType.class), any(Map.class));
   }
 
   @Test

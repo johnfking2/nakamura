@@ -1,0 +1,191 @@
+/**
+ * Licensed to the Sakai Foundation (SF) under one
+ * or more contributor license agreements. See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership. The SF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+package org.sakaiproject.nakamura.user.lite.servlet;
+
+
+import org.apache.felix.scr.annotations.Activate;
+import org.apache.felix.scr.annotations.Component;
+import org.apache.felix.scr.annotations.Modified;
+import org.apache.felix.scr.annotations.Property;
+import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.sling.SlingServlet;
+import org.apache.sling.api.SlingHttpServletRequest;
+import org.apache.sling.api.SlingHttpServletResponse;
+import org.apache.sling.api.request.RequestParameter;
+import org.apache.sling.api.servlets.SlingSafeMethodsServlet;
+import org.apache.sling.commons.osgi.PropertiesUtil;
+import org.sakaiproject.nakamura.api.doc.BindingType;
+import org.sakaiproject.nakamura.api.doc.ServiceBinding;
+import org.sakaiproject.nakamura.api.doc.ServiceDocumentation;
+import org.sakaiproject.nakamura.api.doc.ServiceExtension;
+import org.sakaiproject.nakamura.api.doc.ServiceMethod;
+import org.sakaiproject.nakamura.api.doc.ServiceParameter;
+import org.sakaiproject.nakamura.api.doc.ServiceResponse;
+import org.sakaiproject.nakamura.api.doc.ServiceSelector;
+import org.sakaiproject.nakamura.api.lite.Repository;
+import org.sakaiproject.nakamura.api.lite.Session;
+import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
+import org.sakaiproject.nakamura.api.user.UserFinder;
+import org.sakaiproject.nakamura.util.SparseUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletResponse;
+
+/**
+ * <p>
+ * Sling GET Servlet for checking for the existence of a user.
+ * </p>
+ * <h2>REST Service Description</h2>
+ * <p>
+ * Checks for the existence of a user with the given id. This servlet responds at
+ * <code>/system/userManager/user.exists.html?userid=</code>
+ * </p>
+ * <h4>Methods</h4>
+ * <ul>
+ * <li>GET</li>
+ * </ul>
+ * <h4>GET Parameters</h4>
+ * <dl>
+ * <dt>userid</dt>
+ * <dd>The name of the user to check for</dd>
+ * <dt>*</dt>
+ * <dd>Any additional parameters become properties of the group node (optional)</dd>
+ * </dl>
+ * <h4>Response</h4>
+ * <dl>
+ * <dt>204</dt>
+ * <dd>Success, user exists.</dd>
+ * <dt>404</dt>
+ * <dd>User does not exist.</dd>
+ * </dl>
+ * <h4>Example</h4>
+ *
+ * <code>
+ * curl http://localhost:8080/system/userManager/user.exists.html?userid=foo
+ * </code>
+ *
+ * <h4>Notes</h4>
+ */
+@ServiceDocumentation(name="User Exists Servlet", okForVersion = "1.2",
+    description="Tests for existence of user. This servlet responds at /system/userManager/user.exists.html",
+    shortDescription="Tests for existence of user",
+    bindings=@ServiceBinding(type=BindingType.PATH,bindings="/system/userManager/user",
+        selectors=@ServiceSelector(name="exists", description="Tests for existence of user."),
+        extensions=@ServiceExtension(name="html", description="GETs produce HTML with request status.")),
+    methods=@ServiceMethod(name="GET",
+        description={"Checks for existence of user with id supplied in the userid parameter."},
+        parameters={
+          @ServiceParameter(name="userid", description="The id of the user to check for (required)")},
+        response={
+          @ServiceResponse(code=204,description="Success, user exists. No content returned."),
+          @ServiceResponse(code=400,description="Bad request: the required userid parameter was missing."),
+          @ServiceResponse(code=409,description="The specified username conflicts with a username on the system or is invalid."),
+          @ServiceResponse(code=404,description="The specified user does not exist in the system.")
+        }))
+@Component(immediate=true, metatype=true)
+@SlingServlet(methods={"GET"}, selectors={"exists"}, resourceTypes={"sparse/users"}, generateComponent=false)
+public class LiteUserExistsServlet extends SlingSafeMethodsServlet {
+  private static final long serialVersionUID = 7051557537133012560L;
+
+  private static final Logger LOGGER = LoggerFactory
+      .getLogger(LiteUserExistsServlet.class);
+
+  @Property(label="Delay (MS)",
+      description="Number of milliseconds to delay before responding; 0 to return as quickly as possible",
+      longValue=LiteUserExistsServlet.USER_EXISTS_DELAY_MS_DEFAULT)
+  public static final String USER_EXISTS_DELAY_MS_PROPERTY = "user.exists.delay.ms";
+  public static final long USER_EXISTS_DELAY_MS_DEFAULT = 200;
+  protected long delayMs;
+
+  @Property(label="Restricted name patterns",
+		  description="A regular expression string to check usernames against and report the conflict.",
+		  value=LiteUserExistsServlet.RESTRICTED_USERNAME_REGEX_DEFAULT)
+  public static final String RESTRICTED_USERNAME_REGEX_PROPERTY = "restricted.username.regex";
+  public static final String RESTRICTED_USERNAME_REGEX_DEFAULT  = "admin|administrator.*";
+  protected Pattern restrictedUsernamePattern;
+  
+  @Reference
+  protected UserFinder userFinder;
+
+  @Reference
+  protected Repository repository;
+
+  @Override
+  protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response)
+      throws ServletException, IOException {
+    long start = System.currentTimeMillis();
+    Session session = null;
+    try {
+      RequestParameter idParam = request.getRequestParameter("userid");
+      if (idParam == null) {
+        response.sendError(HttpServletResponse.SC_BAD_REQUEST, "This request must have a 'userid' parameter.");
+        return;
+      }
+
+      if ("".equals(idParam.getString())) {
+        response.sendError(HttpServletResponse.SC_BAD_REQUEST, "The 'userid' parameter must not be blank.");
+        return;
+      }
+
+      session = repository.loginAdministrative();
+      AuthorizableManager am = session.getAuthorizableManager();
+
+      String id = idParam.getString();
+      LOGGER.debug("Checking for existence of {}", id);
+      // finding by id but in AuthorizableManager users are created with id and name being the same string
+      if (userFinder.userExists(id) || am.findAuthorizable(id) != null) {
+        response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+      }
+      else if (restrictedUsernamePattern.matcher(id).matches()){
+        response.sendError(HttpServletResponse.SC_CONFLICT);
+      } else {
+        response.sendError(HttpServletResponse.SC_NOT_FOUND);
+      }
+    } catch (Exception e) {
+      response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getLocalizedMessage());
+      return;
+    } finally {
+      SparseUtils.logoutQuietly(session);
+      LOGGER.debug("checking for existence took {} ms", System.currentTimeMillis() - start);
+      session = null;
+      if (delayMs > 0) {
+        long remainingTime = delayMs - (System.currentTimeMillis() - start);
+        if (remainingTime > 0) {
+          try {
+            Thread.sleep(remainingTime);
+          } catch (InterruptedException e) {
+          }
+        }
+      }
+    }
+  }
+
+  @Activate @Modified
+  protected void modified(Map<?, ?> props) {
+    delayMs = PropertiesUtil.toLong(props.get(USER_EXISTS_DELAY_MS_PROPERTY),
+        USER_EXISTS_DELAY_MS_DEFAULT);
+    restrictedUsernamePattern = Pattern.compile(PropertiesUtil.toString(props.get(RESTRICTED_USERNAME_REGEX_PROPERTY),
+        RESTRICTED_USERNAME_REGEX_DEFAULT), Pattern.CASE_INSENSITIVE);
+  }
+}

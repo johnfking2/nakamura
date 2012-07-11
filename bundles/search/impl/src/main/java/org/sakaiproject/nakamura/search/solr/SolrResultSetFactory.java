@@ -35,7 +35,9 @@ import org.apache.solr.client.solrj.SolrRequest.METHOD;
 import org.apache.solr.client.solrj.SolrServer;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.params.CommonParams;
+import org.apache.solr.common.params.GroupParams;
 import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
@@ -45,23 +47,23 @@ import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.search.DeletedPathsService;
-import org.sakaiproject.nakamura.api.search.SearchUtil;
 import org.sakaiproject.nakamura.api.search.solr.Query;
 import org.sakaiproject.nakamura.api.search.solr.ResultSetFactory;
 import org.sakaiproject.nakamura.api.search.solr.SolrSearchException;
 import org.sakaiproject.nakamura.api.search.solr.SolrSearchResultSet;
 import org.sakaiproject.nakamura.api.search.solr.SolrSearchUtil;
 import org.sakaiproject.nakamura.api.solr.SolrServerService;
+import org.sakaiproject.nakamura.util.telemetry.TelemetryCounter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.List;
 
 /**
  *
@@ -150,7 +152,7 @@ public class SolrResultSetFactory implements ResultSetFactory {
 
       // apply readers restrictions.
       if (asAnon) {
-        filterQueries.add("readers:" + User.ANON_USER);
+        queryOptions.put("readers", User.ANON_USER);
       } else {
         Session session = StorageClientUtils.adaptToSession(request.getResourceResolver().adaptTo(javax.jcr.Session.class));
         if (!User.ADMIN_USER.equals(session.getUserId())) {
@@ -158,10 +160,10 @@ public class SolrResultSetFactory implements ResultSetFactory {
           Authorizable user = am.findAuthorizable(session.getUserId());
           Set<String> readers = Sets.newHashSet();
           for (Iterator<Group> gi = user.memberOf(am); gi.hasNext();) {
-            readers.add(SearchUtil.escapeString(gi.next().getId(), Query.SOLR));
+            readers.add(gi.next().getId());
           }
-          readers.add(SearchUtil.escapeString(session.getUserId(), Query.SOLR));
-          filterQueries.add("readers:(" + StringUtils.join(readers," OR ") + ")");
+          readers.add(session.getUserId());
+          queryOptions.put("readers", StringUtils.join(readers,","));
         }
       }
 
@@ -178,6 +180,12 @@ public class SolrResultSetFactory implements ResultSetFactory {
       // save filterQuery changes
       queryOptions.put(CommonParams.FQ, filterQueries);
 
+      // Ensure proper totals from grouped / collapsed queries.
+      if ("true".equals(queryOptions.get(GroupParams.GROUP)) &&
+          (queryOptions.get(GroupParams.GROUP_TOTAL_COUNT) == null)) {
+        queryOptions.put(GroupParams.GROUP_TOTAL_COUNT, "true");
+      }
+
       SolrQuery solrQuery = buildQuery(request, query.getQueryString(), queryOptions);
 
       SolrServer solrServer = solrSearchService.getServer();
@@ -190,11 +198,14 @@ public class SolrResultSetFactory implements ResultSetFactory {
       long tquery = System.currentTimeMillis();
       QueryResponse response = solrServer.query(solrQuery, queryMethod);
       tquery = System.currentTimeMillis() - tquery;
+      TelemetryCounter.incrementValue("search","SEARCH_PERFORMED",request.getResource().getPath());
       try {
         if ( tquery > verySlowQueryThreshold ) {
           SLOW_QUERY_LOGGER.error("Very slow solr query {} ms {} ",tquery, URLDecoder.decode(solrQuery.toString(),"UTF-8"));
+          TelemetryCounter.incrementValue("search","VERYSLOW",request.getResource().getPath());
         } else if ( tquery > slowQueryThreshold ) {
           SLOW_QUERY_LOGGER.warn("Slow solr query {} ms {} ",tquery, URLDecoder.decode(solrQuery.toString(),"UTF-8"));
+          TelemetryCounter.incrementValue("search", "SLOW", request.getResource().getPath());
         }
       } catch (UnsupportedEncodingException e) {
       }

@@ -30,6 +30,7 @@ import org.sakaiproject.nakamura.api.doc.ServiceMethod;
 import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.doc.DocumentationWriter;
+import org.sakaiproject.nakamura.util.StringUtils;
 
 import java.io.IOException;
 
@@ -40,7 +41,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletResponse;
 
 @SlingServlet(paths = { "/system/doc/search" }, methods = { "GET" })
-@ServiceDocumentation(name = "Search documentation", okForVersion = "1.1",
+@ServiceDocumentation(name = "Search documentation", okForVersion = "1.2",
   description = {
     "Provides auto documentation of search nodes currently in the repository. Documentation will use the ",
     "node properties.",
@@ -71,12 +72,15 @@ public class SearchDocumentationServlet extends SlingSafeMethodsServlet {
   protected void doGet(SlingHttpServletRequest request, SlingHttpServletResponse response)
       throws ServletException, IOException {
 
+    response.setContentType("text/html");
+    response.setCharacterEncoding("UTF-8");
+
     RequestParameter path = request.getRequestParameter(PATH_PARAM);
     Session session = request.getResourceResolver().adaptTo(Session.class);
     DocumentationWriter docWriter = new DocumentationWriter("Search nodes", response
         .getWriter());
     try {
-      if (path != null) {
+      if (path != null && !StringUtils.isEmpty(path.getString())) {
         docWriter.writeSearchInfo(path.getString(), session);
       } else {
         String query = "//*[@sling:resourceType='sakai/solr-search' or @sling:resourceType='sakai/sparse-search'] order by @sakai:title";

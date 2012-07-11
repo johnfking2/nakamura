@@ -50,7 +50,6 @@ import org.sakaiproject.nakamura.api.doc.ServiceParameter;
 import org.sakaiproject.nakamura.api.doc.ServiceResponse;
 import org.sakaiproject.nakamura.api.files.TagUtils;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
-import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
@@ -79,13 +78,13 @@ import java.util.Set;
 
 import javax.servlet.http.HttpServletResponse;
 
-@Component(immediate = true)
+@Component
 @Service(value = SparsePostOperation.class)
 @Properties(value = {
   @Property(name = "sling.post.operation", value = "tag"),
   @Property(name = "service.description", value = "Associates one or more tags with a piece of content."),
   @Property(name = "service.vendor", value = "The Sakai Foundation") })
-@ServiceDocumentation(name = "SparseTagOperation", okForVersion = "1.1",
+@ServiceDocumentation(name = "SparseTagOperation", okForVersion = "1.2",
   shortDescription = "Tag a node",
   description = "Add a tag to a node.",
   bindings = {
@@ -111,11 +110,6 @@ public class SparseTagOperation extends AbstractSparsePostOperation {
 
   @Reference
   protected transient EventAdmin eventAdmin;
-
-  // even though this reference is never used,
-  // keeping it here fixes KERN-2529
-  @Reference
-  private Repository repository;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SparseTagOperation.class);
 
@@ -145,40 +139,13 @@ public class SparseTagOperation extends AbstractSparsePostOperation {
     Content tagContent = null;
 
     if (tagResource == null) {
-      LOGGER.info("tag {} is being created", tagContentPath);
       Session session = StorageClientUtils.adaptToSession(resolver
           .adaptTo(javax.jcr.Session.class));
       Session adminSession = session.getRepository().loginAdministrative();
 
       // wrap in a try so we can ensure logout in finally
       try {
-        ContentManager cm = adminSession.getContentManager();
-        ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
-        String tag = tagContentPath.substring("/tags/".length());
-
-        // create tag
-        builder.put(SAKAI_TAG_NAME, tag);
-        builder.put(SLING_RESOURCE_TYPE_PROPERTY, RT_SAKAI_TAG);
-
-        tagContent = new Content(tagContentPath, builder.build());
-
-        cm.update(tagContent);
-
-        // set ACLs
-        adminSession.getAccessControlManager()
-            .setAcl(
-                Security.ZONE_CONTENT,
-                tagContentPath,
-                new AclModification[] {
-                    new AclModification(AclModification.grantKey(User.ANON_USER),
-                        Permissions.CAN_READ.getPermission(),
-                        AclModification.Operation.OP_REPLACE),
-                    new AclModification(AclModification.grantKey(Group.EVERYONE),
-                        Permissions.CAN_READ.getPermission(),
-                        AclModification.Operation.OP_REPLACE),
-                    new AclModification(AclModification
-                        .grantKey(Group.ADMINISTRATORS_GROUP), Permissions.ALL
-                        .getPermission(), AclModification.Operation.OP_REPLACE) });
+        tagContent = createTag(tagContentPath, adminSession);
       } catch (Exception e) {
         LOGGER.error("error creating tag {}", tagContentPath, e);
       } finally {
@@ -197,6 +164,45 @@ public class SparseTagOperation extends AbstractSparsePostOperation {
       }
     }
 
+    return tagContent;
+  }
+
+  private Content createTag(String tagContentPath, Session adminSession) throws StorageClientException, AccessDeniedException {
+
+    // make sure parent is also a tag, or the special /tags, or the special /tags/directory
+    String parentPath = PathUtils.getParentReference(tagContentPath);
+    Content parent = adminSession.getContentManager().get(parentPath);
+    if ( parent == null && parentPath.startsWith(TAGS_BASE) ) {
+      createTag(parentPath, adminSession);
+    }
+
+    LOGGER.info("tag {} is being created", tagContentPath);
+    ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+    String tag = tagContentPath.substring("/tags/".length());
+
+    // create tag
+    builder.put(SAKAI_TAG_NAME, tag);
+    builder.put(SLING_RESOURCE_TYPE_PROPERTY, RT_SAKAI_TAG);
+
+    Content tagContent = new Content(tagContentPath, builder.build());
+
+    adminSession.getContentManager().update(tagContent);
+
+    // set ACLs
+    adminSession.getAccessControlManager()
+        .setAcl(
+            Security.ZONE_CONTENT,
+            tagContentPath,
+            new AclModification[] {
+                new AclModification(AclModification.grantKey(User.ANON_USER),
+                    Permissions.CAN_READ.getPermission(),
+                    AclModification.Operation.OP_REPLACE),
+                new AclModification(AclModification.grantKey(Group.EVERYONE),
+                    Permissions.CAN_READ.getPermission(),
+                    AclModification.Operation.OP_REPLACE),
+                new AclModification(AclModification
+                    .grantKey(Group.ADMINISTRATORS_GROUP), Permissions.ALL
+                    .getPermission(), AclModification.Operation.OP_REPLACE) });
     return tagContent;
   }
 
