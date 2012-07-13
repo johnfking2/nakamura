@@ -81,7 +81,7 @@ public class DateParser {
                 }
                 return c;
             } catch (ParseException e) {
-                if (log.isDebugEnabled()) {
+              if (log.isDebugEnabled()) {
                     log.debug("Failed parsing " + source + " using " + fmt);
                 }
             }
